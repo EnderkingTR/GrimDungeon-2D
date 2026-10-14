@@ -5,9 +5,9 @@ public abstract class Entity {
     public int width, height;
     public int hp, maxHp;
     public boolean active = true;
-    public boolean solid = true; // Diğer varlıklar içinden geçebilir mi?
+    public boolean solid = true; // Can other entities pass through?
 
-    // Geri tepme (Knockback) hız vektörleri ve hasar parlama sayacı
+    // Knockback velocity vectors and hurt/damage flash timer
     protected double knockbackX = 0, knockbackY = 0;
     protected int hurtTimer = 0;
 
@@ -24,7 +24,7 @@ public abstract class Entity {
 
     public abstract void render(Graphics2D g, boolean debug);
 
-    // Ortak AABB Duvar Çarpışma ve Hareket Metodu
+    // Common AABB Wall Collision and Movement Routine
     protected void moveWithCollision(double dx, double dy, WorldMap map) {
         double totalX = dx + knockbackX;
         double totalY = dy + knockbackY;
@@ -41,7 +41,7 @@ public abstract class Entity {
             knockbackY = 0;
         }
 
-        // Sürtünme (Friction) ile savrulma etkisini sönümle
+        // Friction damping for knockback forces
         knockbackX *= 0.8;
         knockbackY *= 0.8;
         if (Math.abs(knockbackX) < 0.1)
@@ -55,11 +55,11 @@ public abstract class Entity {
 
     public void takeDamage(int amount, double sourceX, double sourceY, double knockbackPower) {
         if (hurtTimer > 0 || !active)
-            return; // Kısa süreli dokunulmazlık (Invincibility frames)
+            return; // Invincibility frames (i-frames)
         hp -= amount;
-        hurtTimer = 12; // 12 tick (0.2 saniye) boyunca beyaz parlar ve tekrar hasar almaz
+        hurtTimer = 12; // 12 ticks (0.2s) white flash and damage immunity
 
-        // Hasar kaynağından dışarı doğru birim vektör hesabı (Knockback yönü)
+        // Unit vector pointing away from damage source (knockback direction)
         double dirX = getCenterX() - sourceX;
         double dirY = getCenterY() - sourceY;
         double len = Math.sqrt(dirX * dirX + dirY * dirY);

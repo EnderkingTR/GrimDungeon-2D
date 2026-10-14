@@ -6,7 +6,7 @@ public enum TileType {
     WALL(2, true, new Color(95, 85, 105), new Color(65, 55, 75));
 
     public final int id;
-    public final boolean solid; // Çarpışma var mı? (Duvar mı?)
+    public final boolean solid; // Does it have collision? (Solid wall)
     public final Color baseColor;
     public final Color borderColor;
 

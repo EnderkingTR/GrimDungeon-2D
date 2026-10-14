@@ -19,7 +19,7 @@ public class Particle {
         this.maxLife = life + random.nextInt(10);
         this.life = this.maxLife;
 
-        // 360 derece rastgele dağılım açısı
+        // 360-degree random spread angle
         double angle = random.nextDouble() * Math.PI * 2;
         double speed = speedMin + random.nextDouble() * (speedMax - speedMin);
         this.vx = Math.cos(angle) * speed;
@@ -30,16 +30,16 @@ public class Particle {
         if (!map.isColliding(x + vx, y, size, size)) {
             x += vx;
         } else {
-            vx = -vx * 0.5; // Duvara çarparsa sek
+            vx = -vx * 0.5; // Bounce off vertical walls
         }
 
         if (!map.isColliding(x, y + vy, size, size)) {
             y += vy;
         } else {
-            vy = -vy * 0.5;
+            vy = -vy * 0.5; // Bounce off horizontal walls
         }
 
-        // Hava sürtünmesi ile yavaşlama
+        // Air drag deceleration
         vx *= 0.88;
         vy *= 0.88;
 

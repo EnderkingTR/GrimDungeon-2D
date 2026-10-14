@@ -1,39 +1,39 @@
-# GrimDungeon 2D - Geliştirme Yol Haritası
+# GrimDungeon 2D - Development Roadmap
 
-## Faz 1: Çekirdek Motor (Core Architecture) - [MEVCUT DURUM]
-- [x] **Game Loop**: Sabit 60 UPS ve Delta Time / Tick hesabı
-- [x] **Rendering**: Triple Buffering ve 2D Kamera (Viewport + LERP yumuşak takip)
-- [x] **Input**: Klavye dinleyicisi (W-A-S-D ve F3 debug toggle)
-- **Çıktı (Milestone)**: Ekranda yırtılma olmadan akıcı hareket eden kamera ve kontrol edilebilir temel mavi nesne.
-
----
-
-## Faz 2: Dünya, Harita ve Fizik (World & Physics)
-- [x] **Tilemap Sistemi**: 2B matrislerle harita katmanları
-- [x] **Prosedürel Üretim**: Cellular Automata veya BSP ile rastgele zindan üretimi
-- [x] **Çarpışma**: AABB (Axis-Aligned Bounding Box) çarpışma testi
-- **Çıktı (Milestone)**: Her çalıştırıldığında farklı oluşan, duvarlarından geçilemeyen etkileşimli bir harita.
+## Phase 1: Core Architecture - [COMPLETED]
+- [x] **Game Loop**: Fixed 60 UPS and Delta Time calculation
+- [x] **Rendering**: Triple Buffering and 2D Camera Viewport (LERP smooth following)
+- [x] **Input**: Keyboard event listener (W-A-S-D and F3 debug toggle)
+- **Milestone Output**: Smooth camera movement without screen tearing and a controllable base entity.
 
 ---
 
-## Faz 3: Varlık Yönetimi (Entity Architecture)
-- [x] **Mimari Tasarım**: Kalıtım yerine Bileşen Tabanlı Mimari (ECS Lite)
-- [x] **Durum Yönetimi**: Karakter statları, envanter ve aksiyon-macera mekanikleri
-- [x] **Sprite & Animasyon**: Kare (Frame) bazlı durum animasyonları
-- **Çıktı (Milestone)**: Oyuncu, düşman, tuzak ve sandık gibi objelerin modüler olarak dünyaya eklenmesi.
+## Phase 2: World, Map & Physics - [COMPLETED]
+- [x] **Tilemap System**: 2D matrices for world map layers
+- [x] **Procedural Generation**: Dungeon generation with rooms and corridors
+- [x] **Collision**: AABB (Axis-Aligned Bounding Box) collision testing
+- **Milestone Output**: An interactive, procedurally generated dungeon with solid walls.
 
 ---
 
-## Faz 4: Strateji ve Yapay Zeka (AI & Pathfinding) - [MEVCUT DURUM]
-- [x] **Yol Bulma**: Engellerin etrafından dolaşan A* (A-Star) algoritması
-- [x] **Karar Mekanizması**: Finite State Machine (FSM) (Devriye, Takip, Saldırı, Kaçış)
-- [x] **Görüş Alanı**: Raycasting veya Bresenham algoritması ile Fog of War (Savaş Sisi)
-- **Çıktı (Milestone)**: Oyuncuyu gördüğünde stratejik olarak en kısa yoldan kuşatan, görmediğinde devriye gezen zeki düşmanlar.
+## Phase 3: Entity Architecture - [COMPLETED]
+- [x] **Architectural Design**: Component-based entity structure
+- [x] **State Management**: Player stats, inventory/gold, interaction mechanics
+- [x] **Entities**: Modular player, enemies, traps, and treasure chests
+- **Milestone Output**: Modular entities integrated into the game world.
 
 ---
 
-## Faz 5: Savaş, Arayüz ve Cila (Combat & UI) - [TAMAMLANDI]
-- [x] **Savaş Sistemi**: Menzil, kılıç savurma (Hitbox), büyü mermileri (Projectile), partikül ve ekran sarsıntısı (Screen Shake)
-- [x] **Hata Ayıklama & Arayüz**: HUD, gerçek zamanlı minimap, FPS/UPS/Partikül sayacı ve durum bildirimleri
-- [x] **Veri Kaydı**: Binary serileştirme ile oyun kaydetme ve yükleme (savegame.dat - [F5] Kaydet / [F9] Yükle)
-- **Çıktı (Milestone)**: Oynanabilir, stratejik derinliği olan, zindan atmosferine ve motor içi analiz araçlarına sahip tam sürüm prototip.
+## Phase 4: Strategy & AI - [COMPLETED]
+- [x] **Pathfinding**: A* (A-Star) algorithm navigating around obstacles
+- [x] **Decision Making**: Finite State Machine (FSM) (Patrol, Chase, Flee)
+- [x] **Field of View**: Bresenham raycasting algorithm with real-time Fog of War
+- **Milestone Output**: Intelligent enemies that track the player through the shortest path and patrol when unaware.
+
+---
+
+## Phase 5: Combat, UI & Polish - [COMPLETED]
+- [x] **Combat System**: Melee sword sweeps (Hitbox), magic projectiles, particles, and screen shake
+- [x] **HUD & Debug UI**: Health bar, minimap, FPS/UPS/particle metrics, and status announcements
+- [x] **Persistence**: Binary serialization save & load system (`savegame.dat` - [F5] Save / [F9] Load)
+- **Milestone Output**: Fully playable, atmospheric prototype with combat depth and integrated analysis tools.

@@ -5,7 +5,7 @@ public class Projectile {
     public double x, y;
     private final double vx, vy;
     private final int radius = 6;
-    private int life = 75; // Menzil sınırı (75 tick)
+    private int life = 75; // Maximum range lifespan (75 ticks)
     public boolean active = true;
 
     public Projectile(double startX, double startY, double targetWorldX, double targetWorldY) {
@@ -22,14 +22,14 @@ public class Projectile {
         y += vy;
         life--;
 
-        // Duvara çarptıysa patla ve kıvılcım saç
+        // Explode and emit sparks if colliding with walls
         if (map.isColliding(x - radius, y - radius, radius * 2, radius * 2)) {
             active = false;
             engine.spawnParticles(x, y, new Color(100, 220, 255), 10);
             return;
         }
 
-        // Düşmana isabet kontrolü
+        // Enemy collision check
         Rectangle bounds = new Rectangle((int) x - radius, (int) y - radius, radius * 2, radius * 2);
         for (Entity e : entities) {
             if (e.active && e instanceof Enemy && bounds.intersects(e.getBounds())) {
@@ -48,10 +48,10 @@ public class Projectile {
     public void render(Graphics2D g) {
         if (!active)
             return;
-        // Dış parlama halesi
+        // Outer glow halo
         g.setColor(new Color(0, 210, 255, 110));
         g.fillOval((int) x - radius - 4, (int) y - radius - 4, (radius + 4) * 2, (radius + 4) * 2);
-        // Çekirdek
+        // Projectile core
         g.setColor(new Color(210, 250, 255));
         g.fillOval((int) x - radius, (int) y - radius, radius * 2, radius * 2);
     }

@@ -26,7 +26,7 @@ public class Engine extends Canvas implements Runnable {
 
     private double camX = 0, camY = 0;
     private double shakeIntensity = 0;
-    private String statusMessage = "Zindana Hoş Geldin! [SPACE]: Kılıç | [Sol Tık]: Büyü";
+    private String statusMessage = "Welcome to GrimDungeon! [SPACE]: Sword | [Left-Click]: Cast";
     private int statusTimer = 240;
 
     private final Random random = new Random();
@@ -40,7 +40,7 @@ public class Engine extends Canvas implements Runnable {
         addKeyListener(input);
         addMouseListener(input);
         addMouseMotionListener(input);
-        input.debugToggle = false; // Başlangıçta atmosferik Fog of War açık başlasın!
+        input.debugToggle = false; // Start with atmospheric Fog of War enabled
 
         worldMap = new WorldMap(60, 60);
         populateWorld();
@@ -109,24 +109,24 @@ public class Engine extends Canvas implements Runnable {
         }
     }
 
-    // F5: Oyun Durumunu Diske Kaydet
+    // F5: Quick Save game state to binary file
     private void saveGameState() {
         try (DataOutputStream out = new DataOutputStream(new FileOutputStream("savegame.dat"))) {
             out.writeDouble(player.x);
             out.writeDouble(player.y);
             out.writeInt(player.hp);
             out.writeInt(player.gold);
-            showStatusMessage("Oyun Kaydedildi (savegame.dat)!");
+            showStatusMessage("Game Saved (savegame.dat)!");
         } catch (IOException e) {
-            showStatusMessage("Kayıt Hatası!");
+            showStatusMessage("Save Failed!");
         }
     }
 
-    // F9: Kayıtlı Oyunu Yükle
+    // F9: Quick Load saved game state
     private void loadGameState() {
         File file = new File("savegame.dat");
         if (!file.exists()) {
-            showStatusMessage("Kayıt Dosyası Bulunamadı!");
+            showStatusMessage("No Save File Found!");
             return;
         }
         try (DataInputStream in = new DataInputStream(new FileInputStream(file))) {
@@ -134,9 +134,9 @@ public class Engine extends Canvas implements Runnable {
             player.y = in.readDouble();
             player.hp = in.readInt();
             player.gold = in.readInt();
-            showStatusMessage("Kayıt Yüklendi!");
+            showStatusMessage("Game Loaded!");
         } catch (IOException e) {
-            showStatusMessage("Yükleme Hatası!");
+            showStatusMessage("Load Failed!");
         }
     }
 
@@ -211,7 +211,7 @@ public class Engine extends Canvas implements Runnable {
         if (input.regenerateMap || !player.active) {
             worldMap.generateDungeon();
             populateWorld();
-            showStatusMessage("Yeni Prosedürel Zindan Üretildi!");
+            showStatusMessage("New Procedural Dungeon Generated!");
             return;
         }
 
@@ -221,7 +221,7 @@ public class Engine extends Canvas implements Runnable {
             if (e.active) {
                 e.update(worldMap, player);
                 if (!e.active && e instanceof Enemy) {
-                    // Düşman öldüğünde patlama partikülleri ve altın ödülü
+                    // Explosion particles and gold reward upon enemy death
                     spawnParticles(e.getCenterX(), e.getCenterY(), new Color(220, 40, 40), 28);
                     player.gold += 25;
                     triggerShake(5.0);
@@ -271,13 +271,13 @@ public class Engine extends Canvas implements Runnable {
         g.setColor(new Color(10, 10, 14));
         g.fillRect(0, 0, WIDTH, HEIGHT);
 
-        // Kamera Sarsıntısı (Screen Shake) Ofseti
+        // Screen shake camera offset
         double shakeX = (random.nextDouble() - 0.5) * 2 * shakeIntensity;
         double shakeY = (random.nextDouble() - 0.5) * 2 * shakeIntensity;
         double renderCamX = camX + shakeX;
         double renderCamY = camY + shakeY;
 
-        // --- DÜNYA ÇİZİMİ BAŞLANGICI ---
+        // --- WORLD RENDERING START (Camera Offset Applied) ---
         g.translate(-renderCamX, -renderCamY);
 
         worldMap.render(g, renderCamX, renderCamY, input.debugToggle);
@@ -296,7 +296,7 @@ public class Engine extends Canvas implements Runnable {
         for (Particle part : particles)
             part.render(g);
 
-        // --- DÜNYA ÇİZİMİ BİTİŞİ ---
+        // --- WORLD RENDERING END ---
         g.translate(renderCamX, renderCamY);
 
         drawPlayerHUD(g);
@@ -315,9 +315,9 @@ public class Engine extends Canvas implements Runnable {
 
         g.setColor(Color.WHITE);
         g.setFont(new Font("Consolas", Font.BOLD, 14));
-        g.drawString("CAN: " + player.hp + " / " + player.maxHp, WIDTH - 220, 38);
+        g.drawString("HP: " + player.hp + " / " + player.maxHp, WIDTH - 220, 38);
 
-        // Görsel Can Barı
+        // Health bar visual
         g.setColor(new Color(50, 20, 20));
         g.fillRoundRect(WIDTH - 220, 45, 185, 10, 5, 5);
         g.setColor(new Color(230, 55, 55));
@@ -325,14 +325,14 @@ public class Engine extends Canvas implements Runnable {
         g.fillRoundRect(WIDTH - 220, 45, hpBarW, 10, 5, 5);
 
         g.setColor(new Color(255, 215, 0));
-        g.drawString("ALTIN: " + player.gold, WIDTH - 220, 76);
+        g.drawString("GOLD: " + player.gold, WIDTH - 220, 76);
 
         long enemiesLeft = entities.stream().filter(e -> e instanceof Enemy).count();
         g.setColor(enemiesLeft == 0 ? new Color(0, 255, 140) : Color.LIGHT_GRAY);
         g.setFont(new Font("Consolas", Font.PLAIN, 12));
-        g.drawString(enemiesLeft == 0 ? "ZİNDAN TEMİZLENDİ!" : "Kalan Düşman: " + enemiesLeft, WIDTH - 220, 98);
+        g.drawString(enemiesLeft == 0 ? "DUNGEON CLEARED!" : "Enemies Left: " + enemiesLeft, WIDTH - 220, 98);
 
-        // Ekran Altı Durum Bildirimi
+        // Bottom status message toast
         if (statusTimer > 0) {
             g.setColor(new Color(0, 0, 0, 180));
             g.fillRoundRect(WIDTH / 2 - 190, HEIGHT - 55, 380, 34, 8, 8);
@@ -368,7 +368,7 @@ public class Engine extends Canvas implements Runnable {
             }
         }
 
-        // Görünür Düşmanları Minimap'te Kırmızı Nokta Olarak Göster
+        // Render visible enemies on minimap as red blips
         for (Entity e : entities) {
             if (e instanceof Enemy) {
                 int ex = (int) (e.getCenterX() / TILE_SIZE);
@@ -380,7 +380,7 @@ public class Engine extends Canvas implements Runnable {
             }
         }
 
-        // Oyuncuyu Mavi Nokta Olarak Göster
+        // Render player on minimap as cyan blip
         int px = (int) (player.getCenterX() / TILE_SIZE);
         int py = (int) (player.getCenterY() / TILE_SIZE);
         g.setColor(Color.CYAN);
@@ -393,19 +393,19 @@ public class Engine extends Canvas implements Runnable {
 
         g.setColor(new Color(0, 255, 140));
         g.setFont(new Font("Consolas", Font.BOLD, 14));
-        g.drawString("FPS: " + currentFps + " | UPS: " + currentUps + " | Partikül: " + particles.size(), 25, 38);
+        g.drawString("FPS: " + currentFps + " | UPS: " + currentUps + " | Particles: " + particles.size(), 25, 38);
 
         g.setColor(Color.WHITE);
         g.setFont(new Font("Consolas", Font.PLAIN, 13));
-        g.drawString(String.format("Oyuncu (X, Y): %.1f, %.1f", player.x, player.y), 25, 62);
+        g.drawString(String.format("Player (X, Y): %.1f, %.1f", player.x, player.y), 25, 62);
 
         int tileX = (int) (player.getCenterX() / TILE_SIZE);
         int tileY = (int) (player.getCenterY() / TILE_SIZE);
-        g.drawString("Karo: [" + tileX + ", " + tileY + "] | Aktif Varlık: " + entities.size(), 25, 84);
-        g.drawString("Kayıt: [F5] Kaydet | [F9] Yükle | [R] Yeni Zindan", 25, 106);
+        g.drawString("Tile: [" + tileX + ", " + tileY + "] | Active Entities: " + entities.size(), 25, 84);
+        g.drawString("Save: [F5] Save | [F9] Load | [R] New Dungeon", 25, 106);
 
         g.setColor(new Color(255, 215, 0));
         g.setFont(new Font("Consolas", Font.ITALIC, 11));
-        g.drawString("[SPACE]: Kılıç | [Sol Tık]: Büyü | [E]: Sandık | [F3]: Debug", 25, 132);
+        g.drawString("[SPACE]: Sword | [Left-Click]: Magic | [E]: Chest | [F3]: Debug", 25, 132);
     }
 }

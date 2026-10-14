@@ -104,7 +104,7 @@ public class WorldMap {
         }
     }
 
-    // Savaş Sisi (Fog of War) ve Görüş Alanı Güncellemesi
+    // Fog of War and Field of View calculation
     public void updateVisibility(int playerTileX, int playerTileY, int viewRadius) {
         for (int x = 0; x < width; x++) {
             for (int y = 0; y < height; y++) {
@@ -129,7 +129,7 @@ public class WorldMap {
         }
     }
 
-    // Bresenham Doğru Algoritması ile iki karo arasında duvar var mı kontrolü
+    // Bresenham's line algorithm for line of sight verification
     public boolean hasLineOfSight(int x0, int y0, int x1, int y1) {
         int dx = Math.abs(x1 - x0);
         int dy = Math.abs(y1 - y0);
@@ -142,9 +142,9 @@ public class WorldMap {
 
         while (true) {
             if (cx == x1 && cy == y1)
-                return true; // Hedefe ulaşıldı (Duvarın kendisi de görünür olur)
+                return true; // Target reached (wall surface itself is visible)
             if (getTile(cx, cy).solid && (cx != x0 || cy != y0)) {
-                return false; // Arada duvar var, ışık arkasına geçemez!
+                return false; // Solid tile encountered, ray blocked
             }
             int e2 = 2 * err;
             if (e2 > -dy) {
@@ -214,7 +214,7 @@ public class WorldMap {
                 int drawX = x * Engine.TILE_SIZE;
                 int drawY = y * Engine.TILE_SIZE;
 
-                // Keşfedilmemiş alanları (Debug kapalıysa) tamamen karanlık bırak
+                // Render undiscovered areas as pitch black unless debug is active
                 if (!debug && !discovered[x][y]) {
                     g.setColor(new Color(10, 10, 14));
                     g.fillRect(drawX, drawY, Engine.TILE_SIZE, Engine.TILE_SIZE);
@@ -233,8 +233,7 @@ public class WorldMap {
                 g.setColor(tile.borderColor);
                 g.drawRect(drawX, drawY, Engine.TILE_SIZE, Engine.TILE_SIZE);
 
-                // Önceden keşfedilmiş ama şu an görüş alanında olmayan karolara yarı saydam sis
-                // uygula
+                // Apply translucent shroud to previously discovered tiles outside current view
                 if (!debug && !visible[x][y]) {
                     g.setColor(new Color(10, 10, 16, 165));
                     g.fillRect(drawX, drawY, Engine.TILE_SIZE, Engine.TILE_SIZE);

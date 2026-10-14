@@ -10,7 +10,7 @@ public class Chest extends Entity {
     public int open() {
         if (!opened) {
             opened = true;
-            return 50; // Sandıktan çıkan altın miktarı
+            return 50; // Gold reward awarded upon opening
         }
         return 0;
     }
@@ -26,7 +26,7 @@ public class Chest extends Entity {
         g.setColor(new Color(45, 30, 15));
         g.drawRoundRect((int) x, (int) y, width, height, 6, 6);
 
-        // Kilit detayı
+        // Lock / latch detail
         g.setColor(opened ? Color.DARK_GRAY : Color.YELLOW);
         g.fillRect((int) getCenterX() - 3, (int) y + 8, 6, 8);
     }

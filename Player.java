@@ -10,14 +10,13 @@ public class Player extends Entity {
 
     private int facingX = 0, facingY = 1;
 
-    // Yakın Dövüş (Melee) ve Menzilli Saldırı Zamanlayıcıları
+    // Melee and ranged attack timers
     private int attackTimer = 0;
     private int attackCooldown = 0;
     private int rangedCooldown = 0;
     private Rectangle attackBox = null;
 
-    // Aynı kılıç savurmasında bir düşmana sadece 1 kez hasar vermek için takip
-    // kümesi
+    // Tracking set to ensure enemies are only hit once per sword swing
     private final Set<Entity> hitEntitiesThisSwing = new HashSet<>();
 
     public Player(double x, double y, InputHandler input) {
@@ -62,23 +61,22 @@ public class Player extends Entity {
     }
 
     public void checkCombatAndInteractions(List<Entity> entities, Engine engine) {
-        // 1. SPACE: Geniş Menzilli Kılıç Saldırısını Başlat
+        // 1. SPACE: Trigger wide melee sword slash
         if (input.attack && attackCooldown == 0) {
-            attackTimer = 12; // Kılıç 12 tick boyunca havada aktif kalır
-            attackCooldown = 20; // Seri saldırı hızı
+            attackTimer = 12; // Sword swing stays active for 12 ticks
+            attackCooldown = 20; // Attack recovery cooldown
             hitEntitiesThisSwing.clear();
             updateAttackBox();
             engine.triggerShake(2.5);
         }
 
-        // Kılıç aktif olduğu sürece (12 tick boyunca) menzile giren her düşmanı biç ve
-        // geri savur!
+        // Damage and knock back any enemies entering the slash hitbox while active
         if (attackTimer > 0 && attackBox != null) {
             for (Entity e : entities) {
                 if (e != this && e.active && e instanceof Enemy && !hitEntitiesThisSwing.contains(e)) {
                     if (attackBox.intersects(e.getBounds())) {
                         hitEntitiesThisSwing.add(e);
-                        // Yüksek Knockback (13.5) ile düşmanı güvenli mesafeye fırlat
+                        // High knockback (13.5) launches enemy away safely
                         e.takeDamage(45, getCenterX(), getCenterY(), 13.5);
                         engine.spawnParticles(e.getCenterX(), e.getCenterY(), new Color(255, 70, 70), 18);
                         engine.triggerShake(6.5);
@@ -87,13 +85,13 @@ public class Player extends Entity {
             }
         }
 
-        // 2. SOL TIK: Fare Yönüne Büyü / Ateş Topu Fırlat
+        // 2. LEFT CLICK: Cast magic projectile towards mouse coordinates
         if (input.mouseAttack && rangedCooldown == 0) {
             rangedCooldown = 16;
             double targetWorldX = input.mouseX + engine.getCamX();
             double targetWorldY = input.mouseY + engine.getCamY();
 
-            // Karakterin yüzünü ateş ettiği yöne çevir
+            // Face the character toward the cast direction
             double angle = Math.atan2(targetWorldY - getCenterY(), targetWorldX - getCenterX());
             facingX = (int) Math.round(Math.cos(angle));
             facingY = (int) Math.round(Math.sin(angle));
@@ -101,7 +99,7 @@ public class Player extends Entity {
             engine.spawnProjectile(getCenterX(), getCenterY(), targetWorldX, targetWorldY);
         }
 
-        // 3. E: Sandık Açma ve Can Yenileme
+        // 3. E: Open chests and restore health
         if (input.interact) {
             Rectangle interactArea = new Rectangle((int) x - 18, (int) y - 18, width + 36, height + 36);
             for (Entity e : entities) {
@@ -109,20 +107,20 @@ public class Player extends Entity {
                     int gained = chest.open();
                     if (gained > 0) {
                         gold += gained;
-                        hp = Math.min(maxHp, hp + 25); // Sandık açmak +25 Can yeniler!
+                        hp = Math.min(maxHp, hp + 25); // Opening chest restores +25 HP
                         engine.spawnParticles(chest.getCenterX(), chest.getCenterY(), new Color(255, 215, 0), 25);
-                        engine.showStatusMessage("+" + gained + " Altın & +25 Can!");
+                        engine.showStatusMessage("+" + gained + " Gold & +25 Health!");
                     }
                 }
             }
         }
     }
 
-    // DÜZELTİLMİŞ MELEE HITBOX: Çok daha uzun (52px ileri) ve geniş (68px yay)
+    // Wide arc melee hitbox calculations
     private void updateAttackBox() {
-        int reach = 52; // İleri uzanma mesafesi (Önceki: 28)
-        int sweep = 68; // Yana doğru kılıç savurma genişliği (Önceki: 38)
-        int offset = 38; // Oyuncu merkezinden ileri kaydırma (Önceki: 22)
+        int reach = 52; // Forward reach
+        int sweep = 68; // Lateral swing arc width
+        int offset = 38; // Forward offset from center
 
         int boxW = (facingX != 0 && facingY == 0) ? reach : (facingX == 0 && facingY != 0) ? sweep : 58;
         int boxH = (facingY != 0 && facingX == 0) ? reach : (facingY == 0 && facingX != 0) ? sweep : 58;
@@ -134,7 +132,7 @@ public class Player extends Entity {
 
     @Override
     public void render(Graphics2D g, boolean debug) {
-        // Kılıç Savurma Görseli (Hilal/Yay Efekti)
+        // Sword slash visual effect (Crescent/Arc)
         if (attackTimer > 0 && attackBox != null) {
             g.setColor(new Color(255, 245, 160, 140));
             g.fillRoundRect(attackBox.x, attackBox.y, attackBox.width, attackBox.height, 28, 28);
@@ -149,11 +147,11 @@ public class Player extends Entity {
             }
         }
 
-        // Oyuncu Gövdesi
+        // Player body
         g.setColor(hurtTimer > 0 ? Color.WHITE : new Color(0, 180, 240));
         g.fillRoundRect((int) x, (int) y, width, height, 8, 8);
 
-        // Bakış Vizörü
+        // Direction visor
         g.setColor(new Color(15, 30, 50));
         int eyeX = (int) getCenterX() + (facingX * 9) - 4;
         int eyeY = (int) getCenterY() + (facingY * 9) - 4;

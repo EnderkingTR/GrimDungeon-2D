@@ -8,8 +8,8 @@ public class Main {
         window.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
         window.setResizable(false);
         window.add(engine);
-        window.pack(); // Pencereyi Canvas boyutuna (960x640) tam oturtur
-        window.setLocationRelativeTo(null); // Ekranın ortasında açar
+        window.pack(); // Fits window perfectly to canvas dimension (960x640)
+        window.setLocationRelativeTo(null); // Center window on screen
         window.setVisible(true);
 
         engine.start();

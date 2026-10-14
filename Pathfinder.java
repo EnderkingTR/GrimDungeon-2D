@@ -40,7 +40,7 @@ public class Pathfinder {
         openSet.add(new Node(startX, startY, 0, heuristic(startX, startY, targetX, targetY), null));
         bestG[startX][startY] = 0;
 
-        // 8 Yönlü Hareket (Düz: 1.0 maliyet, Çapraz: 1.414 maliyet)
+        // 8-directional movement (Straight: 1.0 cost, Diagonal: 1.414 cost)
         int[] dx = { 0, 0, -1, 1, -1, 1, -1, 1 };
         int[] dy = { -1, 1, 0, 0, -1, -1, 1, 1 };
 
@@ -63,7 +63,7 @@ public class Pathfinder {
                 if (map.getTile(nx, ny).solid || closedSet[nx][ny])
                     continue;
 
-                // Çapraz harekette duvar köşelerine takılmayı (Corner Cutting) engelle
+                // Prevent clipping through diagonal wall corners (Corner Cutting prevention)
                 if (i >= 4) {
                     if (map.getTile(current.x + dx[i], current.y).solid ||
                             map.getTile(current.x, current.y + dy[i]).solid) {
@@ -91,7 +91,7 @@ public class Pathfinder {
     private static List<Point> reconstructPath(Node targetNode) {
         List<Point> path = new ArrayList<>();
         Node curr = targetNode;
-        while (curr != null && curr.parent != null) { // Başlangıç karesini atla, doğrudan ilk hedefe yönel
+        while (curr != null && curr.parent != null) { // Skip starting tile, direct to next waypoint
             path.add(new Point(curr.x, curr.y));
             curr = curr.parent;
         }
