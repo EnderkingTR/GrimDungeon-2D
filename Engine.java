@@ -1,6 +1,5 @@
 import java.awt.*;
 import java.awt.image.BufferStrategy;
-import java.io.*;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
@@ -16,18 +15,25 @@ public class Engine extends Canvas implements Runnable {
 
     private int currentFps = 0;
     private int currentUps = 0;
+    private long tickCount = 0;
 
+    private GameState gameState = GameState.MAIN_MENU;
     private final InputHandler input;
+    private final ProfileData profile;
+    private final MenuSystem menuSystem;
+    private final CombatTracker combatTracker = new CombatTracker();
+
     private final WorldMap worldMap;
     private final List<Entity> entities = new ArrayList<>();
     private final List<Particle> particles = new ArrayList<>();
     private final List<Projectile> projectiles = new ArrayList<>();
+    private final List<FloatingText> floatingTexts = new ArrayList<>();
     private Player player;
 
     private double camX = 0, camY = 0;
     private double shakeIntensity = 0;
-    private String statusMessage = "Welcome to GrimDungeon! [SPACE]: Sword | [Left-Click]: Cast";
-    private int statusTimer = 240;
+    private String statusMessage = "GrimDungeon 2D'ye Hoş Geldiniz!";
+    private int statusTimer = 180;
 
     private final Random random = new Random();
 
@@ -40,10 +46,26 @@ public class Engine extends Canvas implements Runnable {
         addKeyListener(input);
         addMouseListener(input);
         addMouseMotionListener(input);
-        input.debugToggle = false; // Start with atmospheric Fog of War enabled
+        input.debugToggle = false;
+
+        profile = new ProfileData();
+        profile.load();
 
         worldMap = new WorldMap(60, 60);
-        populateWorld();
+        menuSystem = new MenuSystem(this, profile, input);
+        populateWorld(profile.selectedStage);
+    }
+
+    public long getTickCount() {
+        return tickCount;
+    }
+
+    public CombatTracker getCombatTracker() {
+        return combatTracker;
+    }
+
+    public void setGameState(GameState newState) {
+        this.gameState = newState;
     }
 
     public double getCamX() {
@@ -73,12 +95,34 @@ public class Engine extends Canvas implements Runnable {
         projectiles.add(new Projectile(startX, startY, targetX, targetY));
     }
 
-    private void populateWorld() {
+    public void spawnCustomProjectile(Projectile p) {
+        projectiles.add(p);
+    }
+
+    public void spawnFloatingText(double x, double y, String text, Color color, boolean isCrit) {
+        floatingTexts.add(new FloatingText(x, y, text, color, isCrit));
+    }
+
+    public void startStage(int stageLevel) {
+        profile.selectedStage = stageLevel;
+        int targetRooms = Math.min(16, 6 + stageLevel / 2);
+        worldMap.generateDungeon(targetRooms);
+        populateWorld(stageLevel);
+        combatTracker.reset();
+        gameState = GameState.PLAYING;
+        showStatusMessage("Bölüm " + stageLevel + " Başladı! [Sol Tık/Space]: Saldırı | [Sağ Tık/Q]: Yetenek");
+    }
+
+    private void populateWorld(int stageLevel) {
         entities.clear();
         particles.clear();
         projectiles.clear();
+        floatingTexts.clear();
 
-        player = new Player(worldMap.spawnX - 16, worldMap.spawnY - 16, input);
+        HeroClass hero = profile.selectedHero;
+        ProfileData.ComputedStats stats = profile.computeStats(hero);
+        player = new Player(worldMap.spawnX - 16, worldMap.spawnY - 16, input, hero, stats);
+        player.engineRef = this;
         entities.add(player);
 
         camX = player.getCenterX() - (WIDTH / 2.0);
@@ -90,53 +134,80 @@ public class Engine extends Canvas implements Runnable {
             double centerX = room.getCenterX() * TILE_SIZE;
             double centerY = room.getCenterY() * TILE_SIZE;
 
-            entities.add(new Enemy(centerX - 15, centerY - 15));
-            if (room.width >= 8 && random.nextBoolean()) {
-                entities.add(new Enemy(centerX + 25, centerY - 15));
+            int roll = random.nextInt(100);
+
+            if (roll < 35) {
+                // Standard Melee Guards + optional Ranged support
+                Enemy melee = new Enemy(centerX - 15, centerY - 15, stageLevel);
+                melee.engineRef = this;
+                entities.add(melee);
+
+                if (stageLevel >= 2 && random.nextBoolean()) {
+                    RangedEnemy ranged = new RangedEnemy(centerX + 24, centerY - 15, stageLevel);
+                    ranged.engineRef = this;
+                    entities.add(ranged);
+                }
+            } else if (roll < 70) {
+                // Swarm Pack controlled by a single shared SwarmHiveMind!
+                SwarmHiveMind hiveMind = new SwarmHiveMind();
+                int swarmSize = 4 + Math.min(4, stageLevel / 3) + random.nextInt(2);
+                for (int s = 0; s < swarmSize; s++) {
+                    double angle = (2 * Math.PI * s) / swarmSize;
+                    double sx = centerX - 9 + Math.cos(angle) * 26;
+                    double sy = centerY - 9 + Math.sin(angle) * 26;
+                    if (!worldMap.isColliding(sx, sy, 18, 18)) {
+                        SwarmEnemy se = new SwarmEnemy(sx, sy, hiveMind, stageLevel, s == 0);
+                        se.engineRef = this;
+                        entities.add(se);
+                    }
+                }
+            } else {
+                // Mixed Room: Turret (Stage 3+) or Ranged + Melee
+                if (stageLevel >= 3) {
+                    TurretEnemy turret = new TurretEnemy(centerX - 17, centerY - 17, stageLevel);
+                    turret.engineRef = this;
+                    entities.add(turret);
+                } else {
+                    Enemy melee = new Enemy(centerX - 15, centerY - 15, stageLevel);
+                    melee.engineRef = this;
+                    entities.add(melee);
+                }
+
+                if (stageLevel >= 2) {
+                    RangedEnemy ranged = new RangedEnemy(centerX - 35, centerY + 18, stageLevel);
+                    ranged.engineRef = this;
+                    entities.add(ranged);
+                }
             }
 
-            if (random.nextDouble() < 0.45) {
+            // Spawn Chests
+            if (random.nextDouble() < 0.42) {
                 double chestX = (room.x + 1) * TILE_SIZE + 8;
                 double chestY = (room.y + 1) * TILE_SIZE + 10;
-                entities.add(new Chest(chestX, chestY));
+                Chest chest = new Chest(chestX, chestY);
+                chest.engineRef = this;
+                entities.add(chest);
             }
 
-            if (random.nextDouble() < 0.50) {
+            // Spawn Traps (SpikeTrap, AcidTrap, or DartTrap)
+            if (random.nextDouble() < 0.58) {
                 double trapX = (room.x + room.width - 2) * TILE_SIZE + 6;
                 double trapY = (room.y + room.height - 2) * TILE_SIZE + 6;
-                entities.add(new SpikeTrap(trapX, trapY));
+                int trapType = random.nextInt(3);
+                if (trapType == 0) {
+                    SpikeTrap st = new SpikeTrap(trapX, trapY);
+                    st.engineRef = this;
+                    entities.add(st);
+                } else if (trapType == 1) {
+                    AcidTrap at = new AcidTrap(trapX, trapY);
+                    at.engineRef = this;
+                    entities.add(at);
+                } else {
+                    DartTrap dt = new DartTrap(trapX, trapY, Double.NaN);
+                    dt.engineRef = this;
+                    entities.add(dt);
+                }
             }
-        }
-    }
-
-    // F5: Quick Save game state to binary file
-    private void saveGameState() {
-        try (DataOutputStream out = new DataOutputStream(new FileOutputStream("savegame.dat"))) {
-            out.writeDouble(player.x);
-            out.writeDouble(player.y);
-            out.writeInt(player.hp);
-            out.writeInt(player.gold);
-            showStatusMessage("Game Saved (savegame.dat)!");
-        } catch (IOException e) {
-            showStatusMessage("Save Failed!");
-        }
-    }
-
-    // F9: Quick Load saved game state
-    private void loadGameState() {
-        File file = new File("savegame.dat");
-        if (!file.exists()) {
-            showStatusMessage("No Save File Found!");
-            return;
-        }
-        try (DataInputStream in = new DataInputStream(new FileInputStream(file))) {
-            player.x = in.readDouble();
-            player.y = in.readDouble();
-            player.hp = in.readInt();
-            player.gold = in.readInt();
-            showStatusMessage("Game Loaded!");
-        } catch (IOException e) {
-            showStatusMessage("Load Failed!");
         }
     }
 
@@ -201,30 +272,58 @@ public class Engine extends Canvas implements Runnable {
     }
 
     private void update() {
+        tickCount++;
         input.update();
 
-        if (input.saveGame)
-            saveGameState();
-        if (input.loadGame)
-            loadGameState();
+        if (input.saveGame) {
+            profile.save();
+            showStatusMessage("Profil Kaydedildi (savegame.dat)!");
+        }
+        if (input.loadGame) {
+            if (profile.load()) {
+                showStatusMessage("Profil Yüklendi!");
+            }
+        }
 
-        if (input.regenerateMap || !player.active) {
-            worldMap.generateDungeon();
-            populateWorld();
-            showStatusMessage("New Procedural Dungeon Generated!");
+        if (gameState != GameState.PLAYING) {
+            menuSystem.update(gameState);
             return;
         }
 
+        // In PLAYING state:
+        if (input.escapeJustPressed) {
+            profile.save();
+            gameState = GameState.MAIN_MENU;
+            return;
+        }
+
+        if (input.regenerateMap) {
+            startStage(profile.selectedStage);
+            return;
+        }
+
+        if (!player.active) {
+            profile.gold += player.gold;
+            profile.save();
+            gameState = GameState.GAME_OVER;
+            return;
+        }
+
+        combatTracker.elapsedTicks++;
         player.checkCombatAndInteractions(entities, this);
 
         for (Entity e : entities) {
             if (e.active) {
+                e.engineRef = this;
                 e.update(worldMap, player);
-                if (!e.active && e instanceof Enemy) {
-                    // Explosion particles and gold reward upon enemy death
-                    spawnParticles(e.getCenterX(), e.getCenterY(), new Color(220, 40, 40), 28);
-                    player.gold += 25;
-                    triggerShake(5.0);
+                if (!e.active && e.isHostile) {
+                    int goldDrop = (e instanceof SwarmEnemy) ? 8 : (e instanceof TurretEnemy ? 28 : 18);
+                    spawnParticles(e.getCenterX(), e.getCenterY(), new Color(220, 40, 40), 22);
+                    player.gold += goldDrop;
+                    combatTracker.enemiesKilled++;
+                    combatTracker.goldEarnedInStage += goldDrop;
+                    spawnFloatingText(e.getCenterX(), e.y, "+" + goldDrop + "G", new Color(255, 215, 50), false);
+                    triggerShake(3.5);
                 }
             }
         }
@@ -232,12 +331,31 @@ public class Engine extends Canvas implements Runnable {
         entities.removeIf(e -> !e.active && e != player);
 
         for (Projectile proj : projectiles)
-            proj.update(worldMap, entities, this);
+            proj.update(worldMap, entities, player, this);
         projectiles.removeIf(p -> !p.active);
 
         for (Particle part : particles)
             part.update(worldMap);
         particles.removeIf(p -> !p.active);
+
+        for (FloatingText ft : floatingTexts)
+            ft.update();
+        floatingTexts.removeIf(ft -> !ft.active);
+
+        // Check automatic Stage Clear condition: all hostile enemies defeated!
+        long remainingHostiles = entities.stream().filter(e -> e.active && e.isHostile).count();
+        if (remainingHostiles == 0) {
+            int stageBonusGold = 50 + profile.selectedStage * 20;
+            combatTracker.goldEarnedInStage += stageBonusGold;
+            profile.gold += player.gold + stageBonusGold;
+            profile.victoryChests += 1;
+            if (profile.selectedStage >= profile.unlockedStage && profile.unlockedStage < ProfileData.MAX_STAGES) {
+                profile.unlockedStage++;
+            }
+            profile.save();
+            gameState = GameState.STAGE_CLEAR;
+            return;
+        }
 
         int pTileX = (int) (player.getCenterX() / TILE_SIZE);
         int pTileY = (int) (player.getCenterY() / TILE_SIZE);
@@ -268,21 +386,27 @@ public class Engine extends Canvas implements Runnable {
         Graphics2D g = (Graphics2D) bs.getDrawGraphics();
         g.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
 
+        if (gameState == GameState.MAIN_MENU || gameState == GameState.CHEST_OPENING) {
+            menuSystem.render(g, gameState, combatTracker);
+            g.dispose();
+            bs.show();
+            return;
+        }
+
         g.setColor(new Color(10, 10, 14));
         g.fillRect(0, 0, WIDTH, HEIGHT);
 
-        // Screen shake camera offset
         double shakeX = (random.nextDouble() - 0.5) * 2 * shakeIntensity;
         double shakeY = (random.nextDouble() - 0.5) * 2 * shakeIntensity;
         double renderCamX = camX + shakeX;
         double renderCamY = camY + shakeY;
 
-        // --- WORLD RENDERING START (Camera Offset Applied) ---
+        // --- WORLD RENDERING START ---
         g.translate(-renderCamX, -renderCamY);
 
         worldMap.render(g, renderCamX, renderCamY, input.debugToggle);
 
-        entities.sort(Comparator.comparingDouble(e -> (e instanceof SpikeTrap) ? -10000 : e.y + e.height));
+        entities.sort(Comparator.comparingDouble(e -> (e instanceof SpikeTrap || e instanceof AcidTrap || e instanceof DartTrap) ? -10000 : e.y + e.height));
         for (Entity e : entities) {
             int eTileX = (int) (e.getCenterX() / TILE_SIZE);
             int eTileY = (int) (e.getCenterY() / TILE_SIZE);
@@ -295,6 +419,8 @@ public class Engine extends Canvas implements Runnable {
             proj.render(g);
         for (Particle part : particles)
             part.render(g);
+        for (FloatingText ft : floatingTexts)
+            ft.render(g);
 
         // --- WORLD RENDERING END ---
         g.translate(renderCamX, renderCamY);
@@ -305,37 +431,65 @@ public class Engine extends Canvas implements Runnable {
             drawDebugUI(g);
         }
 
+        if (gameState == GameState.STAGE_CLEAR || gameState == GameState.GAME_OVER) {
+            menuSystem.render(g, gameState, combatTracker);
+        }
+
         g.dispose();
         bs.show();
     }
 
     private void drawPlayerHUD(Graphics2D g) {
-        g.setColor(new Color(0, 0, 0, 185));
-        g.fillRoundRect(WIDTH - 235, 15, 215, 95, 10, 10);
+        g.setColor(new Color(0, 0, 0, 195));
+        g.fillRoundRect(WIDTH - 250, 15, 232, 130, 10, 10);
+        g.setColor(player.heroClass.themeColor);
+        g.drawRoundRect(WIDTH - 250, 15, 232, 130, 10, 10);
+
+        g.setColor(player.heroClass.themeColor);
+        g.setFont(new Font("Consolas", Font.BOLD, 13));
+        g.drawString("BÖLÜM " + profile.selectedStage + " | " + player.heroClass.displayName, WIDTH - 236, 35);
 
         g.setColor(Color.WHITE);
-        g.setFont(new Font("Consolas", Font.BOLD, 14));
-        g.drawString("HP: " + player.hp + " / " + player.maxHp, WIDTH - 220, 38);
+        g.setFont(new Font("Consolas", Font.BOLD, 13));
+        g.drawString("CAN: " + player.hp + " / " + player.maxHp, WIDTH - 236, 54);
 
-        // Health bar visual
+        // Health bar
         g.setColor(new Color(50, 20, 20));
-        g.fillRoundRect(WIDTH - 220, 45, 185, 10, 5, 5);
+        g.fillRoundRect(WIDTH - 236, 60, 200, 10, 5, 5);
         g.setColor(new Color(230, 55, 55));
-        int hpBarW = (int) ((player.hp / (double) player.maxHp) * 185);
-        g.fillRoundRect(WIDTH - 220, 45, hpBarW, 10, 5, 5);
+        int hpBarW = (int) ((player.hp / (double) player.maxHp) * 200);
+        g.fillRoundRect(WIDTH - 236, 60, hpBarW, 10, 5, 5);
+
+        // Active Skill cooldown bar
+        g.setColor(new Color(25, 35, 55));
+        g.fillRoundRect(WIDTH - 236, 78, 200, 8, 4, 4);
+        double skillReadyRatio = 1.0 - (player.getSkillCooldown() / (double) Math.max(1, player.getMaxSkillCooldown()));
+        g.setColor(skillReadyRatio >= 1.0 ? new Color(80, 235, 255) : new Color(60, 130, 190));
+        g.fillRoundRect(WIDTH - 236, 78, (int) (skillReadyRatio * 200), 8, 4, 4);
+
+        g.setFont(new Font("Consolas", Font.PLAIN, 11));
+        g.setColor( new Color(180, 225, 255));
+        g.drawString("[Sağ Tık/Q] " + player.heroClass.skillName, WIDTH - 236, 100);
 
         g.setColor(new Color(255, 215, 0));
-        g.drawString("GOLD: " + player.gold, WIDTH - 220, 76);
+        g.setFont(new Font("Consolas", Font.BOLD, 12));
+        g.drawString("ALTIN: " + (profile.gold + player.gold), WIDTH - 236, 118);
 
-        long enemiesLeft = entities.stream().filter(e -> e instanceof Enemy).count();
-        g.setColor(enemiesLeft == 0 ? new Color(0, 255, 140) : Color.LIGHT_GRAY);
-        g.setFont(new Font("Consolas", Font.PLAIN, 12));
-        g.drawString(enemiesLeft == 0 ? "DUNGEON CLEARED!" : "Enemies Left: " + enemiesLeft, WIDTH - 220, 98);
+        long enemiesLeft = entities.stream().filter(e -> e.active && e.isHostile).count();
+        g.setColor(enemiesLeft == 0 ? new Color(0, 255, 140) : new Color(255, 120, 120));
+        g.drawString("Kalan Düşman: " + enemiesLeft, WIDTH - 236, 136);
+
+        // Top-left quick menu hint
+        g.setColor(new Color(0, 0, 0, 160));
+        g.fillRoundRect(15, 15, 175, 28, 8, 8);
+        g.setColor(Color.LIGHT_GRAY);
+        g.setFont(new Font("Consolas", Font.BOLD, 12));
+        g.drawString("[ESC]: Lobi / Ana Menü", 25, 33);
 
         // Bottom status message toast
         if (statusTimer > 0) {
-            g.setColor(new Color(0, 0, 0, 180));
-            g.fillRoundRect(WIDTH / 2 - 190, HEIGHT - 55, 380, 34, 8, 8);
+            g.setColor(new Color(0, 0, 0, 185));
+            g.fillRoundRect(WIDTH / 2 - 245, HEIGHT - 55, 490, 34, 8, 8);
             g.setColor(new Color(0, 235, 255));
             g.setFont(new Font("Consolas", Font.BOLD, 13));
             FontMetrics fm = g.getFontMetrics();
@@ -368,19 +522,17 @@ public class Engine extends Canvas implements Runnable {
             }
         }
 
-        // Render visible enemies on minimap as red blips
         for (Entity e : entities) {
-            if (e instanceof Enemy) {
+            if (e.active && e.isHostile) {
                 int ex = (int) (e.getCenterX() / TILE_SIZE);
                 int ey = (int) (e.getCenterY() / TILE_SIZE);
                 if (input.debugToggle || worldMap.isVisible(ex, ey)) {
-                    g.setColor(Color.RED);
+                    g.setColor(e instanceof SwarmEnemy ? Color.ORANGE : Color.RED);
                     g.fillRect(startX + ex * scale, startY + ey * scale, scale + 1, scale + 1);
                 }
             }
         }
 
-        // Render player on minimap as cyan blip
         int px = (int) (player.getCenterX() / TILE_SIZE);
         int py = (int) (player.getCenterY() / TILE_SIZE);
         g.setColor(Color.CYAN);
@@ -389,23 +541,18 @@ public class Engine extends Canvas implements Runnable {
 
     private void drawDebugUI(Graphics2D g) {
         g.setColor(new Color(0, 0, 0, 185));
-        g.fillRoundRect(15, 15, 415, 145, 10, 10);
+        g.fillRoundRect(15, 50, 425, 130, 10, 10);
 
         g.setColor(new Color(0, 255, 140));
         g.setFont(new Font("Consolas", Font.BOLD, 14));
-        g.drawString("FPS: " + currentFps + " | UPS: " + currentUps + " | Particles: " + particles.size(), 25, 38);
+        g.drawString("FPS: " + currentFps + " | UPS: " + currentUps + " | Entities: " + entities.size(), 25, 72);
 
         g.setColor(Color.WHITE);
-        g.setFont(new Font("Consolas", Font.PLAIN, 13));
-        g.drawString(String.format("Player (X, Y): %.1f, %.1f", player.x, player.y), 25, 62);
-
-        int tileX = (int) (player.getCenterX() / TILE_SIZE);
-        int tileY = (int) (player.getCenterY() / TILE_SIZE);
-        g.drawString("Tile: [" + tileX + ", " + tileY + "] | Active Entities: " + entities.size(), 25, 84);
-        g.drawString("Save: [F5] Save | [F9] Load | [R] New Dungeon", 25, 106);
+        g.setFont(new Font("Consolas", Font.PLAIN, 12));
+        g.drawString(String.format("Player: (%.1f, %.1f) | DmgDealt: %d", player.x, player.y, combatTracker.totalDamageDealt), 25, 95);
+        g.drawString("Swarm: Hive Mind A* Active | [F5]: Kaydet | [F9]: Yükle", 25, 116);
 
         g.setColor(new Color(255, 215, 0));
-        g.setFont(new Font("Consolas", Font.ITALIC, 11));
-        g.drawString("[SPACE]: Sword | [Left-Click]: Magic | [E]: Chest | [F3]: Debug", 25, 132);
+        g.drawString("[Sol Tık/Space]: Saldır | [Sağ Tık/Q]: Yetenek | [E]: Sandık", 25, 140);
     }
 }

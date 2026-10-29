@@ -48,6 +48,10 @@ public class WorldMap {
     }
 
     public void generateDungeon() {
+        generateDungeon(10);
+    }
+
+    public void generateDungeon(int maxRooms) {
         rooms.clear();
         for (int x = 0; x < width; x++) {
             for (int y = 0; y < height; y++) {
@@ -57,9 +61,8 @@ public class WorldMap {
             }
         }
 
-        int maxRooms = 18;
         int minSize = 5;
-        int maxSize = 11;
+        int maxSize = 10;
 
         for (int i = 0; i < maxRooms; i++) {
             int roomW = random.nextInt(maxSize - minSize + 1) + minSize;
