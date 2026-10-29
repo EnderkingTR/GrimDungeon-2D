@@ -1,14 +1,19 @@
 import java.awt.*;
+import java.awt.geom.AffineTransform;
 import java.awt.image.BufferStrategy;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Random;
+import javax.swing.JFrame;
 
 public class Engine extends Canvas implements Runnable {
     public static final int WIDTH = 960;
     public static final int HEIGHT = 640;
     public static final int TILE_SIZE = 48;
+
+    private JFrame window;
+    private volatile boolean pendingDisplayUpdate = false;
 
     private Thread gameThread;
     private boolean running = false;
@@ -54,6 +59,70 @@ public class Engine extends Canvas implements Runnable {
         worldMap = new WorldMap(60, 60);
         menuSystem = new MenuSystem(this, profile, input);
         populateWorld(profile.selectedStage);
+    }
+
+    public void attachWindow(JFrame frame) {
+        this.window = frame;
+        applyDisplaySettingsNow();
+    }
+
+    public void requestDisplayUpdate() {
+        this.pendingDisplayUpdate = true;
+    }
+
+    private void applyDisplaySettingsNow() {
+        if (window == null) return;
+        pendingDisplayUpdate = false;
+
+        GraphicsDevice gd = GraphicsEnvironment.getLocalGraphicsEnvironment().getDefaultScreenDevice();
+        if (gd.getFullScreenWindow() == window) {
+            gd.setFullScreenWindow(null);
+        }
+
+        GameState.DisplayMode mode = profile.displayMode;
+        if (mode == GameState.DisplayMode.WINDOWED) {
+            int idx = Math.max(0, Math.min(ProfileData.RES_PRESETS.length - 1, profile.resolutionIndex));
+            int targetW = ProfileData.RES_PRESETS[idx][0];
+            int targetH = ProfileData.RES_PRESETS[idx][1];
+
+            if (window.isDisplayable() && window.isUndecorated()) {
+                window.dispose();
+                window.setUndecorated(false);
+            }
+            setPreferredSize(new Dimension(targetW, targetH));
+            setSize(targetW, targetH);
+            window.getContentPane().setPreferredSize(new Dimension(targetW, targetH));
+            window.pack();
+            window.setLocationRelativeTo(null);
+            window.setVisible(true);
+        } else if (mode == GameState.DisplayMode.BORDERLESS_FULLSCREEN) {
+            Rectangle screenBounds = gd.getDefaultConfiguration().getBounds();
+            if (window.isDisplayable()) {
+                window.dispose();
+            }
+            window.setUndecorated(true);
+            setPreferredSize(new Dimension(screenBounds.width, screenBounds.height));
+            setSize(screenBounds.width, screenBounds.height);
+            window.setBounds(screenBounds);
+            window.setVisible(true);
+        } else if (mode == GameState.DisplayMode.FULLSCREEN) {
+            Rectangle screenBounds = gd.getDefaultConfiguration().getBounds();
+            if (window.isDisplayable()) {
+                window.dispose();
+            }
+            window.setUndecorated(true);
+            setPreferredSize(new Dimension(screenBounds.width, screenBounds.height));
+            setSize(screenBounds.width, screenBounds.height);
+            window.setVisible(true);
+            if (gd.isFullScreenSupported()) {
+                gd.setFullScreenWindow(window);
+            } else {
+                window.setBounds(screenBounds);
+            }
+        }
+
+        createBufferStrategy(3);
+        requestFocus();
     }
 
     public long getTickCount() {
@@ -275,6 +344,19 @@ public class Engine extends Canvas implements Runnable {
         tickCount++;
         input.update();
 
+        if (input.f11JustPressed) {
+            GameState.DisplayMode[] modes = GameState.DisplayMode.values();
+            int nextOrd = (profile.displayMode.ordinal() + 1) % modes.length;
+            profile.displayMode = modes[nextOrd];
+            profile.save();
+            pendingDisplayUpdate = true;
+            showStatusMessage("Ekran Modu [F11]: " + profile.displayMode.displayName);
+        }
+
+        if (pendingDisplayUpdate) {
+            applyDisplaySettingsNow();
+        }
+
         if (input.saveGame) {
             profile.save();
             showStatusMessage("Profil Kaydedildi (savegame.dat)!");
@@ -377,66 +459,93 @@ public class Engine extends Canvas implements Runnable {
     }
 
     private void render() {
+        if (pendingDisplayUpdate) {
+            applyDisplaySettingsNow();
+        }
+
         BufferStrategy bs = getBufferStrategy();
         if (bs == null) {
             createBufferStrategy(3);
             return;
         }
 
-        Graphics2D g = (Graphics2D) bs.getDrawGraphics();
-        g.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+        try {
+            Graphics2D g = (Graphics2D) bs.getDrawGraphics();
+            g.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
 
-        if (gameState == GameState.MAIN_MENU || gameState == GameState.CHEST_OPENING) {
-            menuSystem.render(g, gameState, combatTracker);
+            int canvasW = Math.max(1, getWidth());
+            int canvasH = Math.max(1, getHeight());
+            double scale = Math.min(canvasW / (double) WIDTH, canvasH / (double) HEIGHT);
+            double offsetX = (canvasW - WIDTH * scale) / 2.0;
+            double offsetY = (canvasH - HEIGHT * scale) / 2.0;
+
+            input.setViewportTransform(scale, offsetX, offsetY);
+
+            // Fill physical window background (letterbox/pillarbox area)
+            g.setColor(new Color(8, 9, 14));
+            g.fillRect(0, 0, canvasW, canvasH);
+
+            AffineTransform rootTransform = g.getTransform();
+            g.translate(offsetX, offsetY);
+            g.scale(scale, scale);
+            g.clipRect(0, 0, WIDTH, HEIGHT);
+
+            if (gameState == GameState.MAIN_MENU || gameState == GameState.CHEST_OPENING) {
+                menuSystem.render(g, gameState, combatTracker);
+                g.setTransform(rootTransform);
+                g.dispose();
+                bs.show();
+                return;
+            }
+
+            g.setColor(new Color(10, 10, 14));
+            g.fillRect(0, 0, WIDTH, HEIGHT);
+
+            double shakeX = (random.nextDouble() - 0.5) * 2 * shakeIntensity;
+            double shakeY = (random.nextDouble() - 0.5) * 2 * shakeIntensity;
+            double renderCamX = camX + shakeX;
+            double renderCamY = camY + shakeY;
+
+            // --- WORLD RENDERING START ---
+            g.translate(-renderCamX, -renderCamY);
+
+            worldMap.render(g, renderCamX, renderCamY, input.debugToggle);
+
+            entities.sort(Comparator.comparingDouble(e -> (e instanceof SpikeTrap || e instanceof AcidTrap || e instanceof DartTrap) ? -10000 : e.y + e.height));
+            for (Entity e : entities) {
+                int eTileX = (int) (e.getCenterX() / TILE_SIZE);
+                int eTileY = (int) (e.getCenterY() / TILE_SIZE);
+                if (input.debugToggle || e == player || worldMap.isVisible(eTileX, eTileY)) {
+                    e.render(g, input.debugToggle);
+                }
+            }
+
+            for (Projectile proj : projectiles)
+                proj.render(g);
+            for (Particle part : particles)
+                part.render(g);
+            for (FloatingText ft : floatingTexts)
+                ft.render(g);
+
+            // --- WORLD RENDERING END ---
+            g.translate(renderCamX, renderCamY);
+
+            drawPlayerHUD(g);
+            drawMinimap(g);
+            if (input.debugToggle) {
+                drawDebugUI(g);
+            }
+
+            if (gameState == GameState.STAGE_CLEAR || gameState == GameState.GAME_OVER) {
+                menuSystem.render(g, gameState, combatTracker);
+            }
+
+            g.setTransform(rootTransform);
             g.dispose();
             bs.show();
-            return;
+        } catch (IllegalStateException ignored) {
+            // BufferStrategy invalidated during window mode switch; recreated next frame
         }
-
-        g.setColor(new Color(10, 10, 14));
-        g.fillRect(0, 0, WIDTH, HEIGHT);
-
-        double shakeX = (random.nextDouble() - 0.5) * 2 * shakeIntensity;
-        double shakeY = (random.nextDouble() - 0.5) * 2 * shakeIntensity;
-        double renderCamX = camX + shakeX;
-        double renderCamY = camY + shakeY;
-
-        // --- WORLD RENDERING START ---
-        g.translate(-renderCamX, -renderCamY);
-
-        worldMap.render(g, renderCamX, renderCamY, input.debugToggle);
-
-        entities.sort(Comparator.comparingDouble(e -> (e instanceof SpikeTrap || e instanceof AcidTrap || e instanceof DartTrap) ? -10000 : e.y + e.height));
-        for (Entity e : entities) {
-            int eTileX = (int) (e.getCenterX() / TILE_SIZE);
-            int eTileY = (int) (e.getCenterY() / TILE_SIZE);
-            if (input.debugToggle || e == player || worldMap.isVisible(eTileX, eTileY)) {
-                e.render(g, input.debugToggle);
-            }
-        }
-
-        for (Projectile proj : projectiles)
-            proj.render(g);
-        for (Particle part : particles)
-            part.render(g);
-        for (FloatingText ft : floatingTexts)
-            ft.render(g);
-
-        // --- WORLD RENDERING END ---
-        g.translate(renderCamX, renderCamY);
-
-        drawPlayerHUD(g);
-        drawMinimap(g);
-        if (input.debugToggle) {
-            drawDebugUI(g);
-        }
-
-        if (gameState == GameState.STAGE_CLEAR || gameState == GameState.GAME_OVER) {
-            menuSystem.render(g, gameState, combatTracker);
-        }
-
-        g.dispose();
-        bs.show();
     }
 
     private void drawPlayerHUD(Graphics2D g) {

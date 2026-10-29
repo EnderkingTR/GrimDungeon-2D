@@ -52,3 +52,4 @@ All notable changes and architectural milestones for **GrimDungeon 2D** are docu
 - Procedural room & corridor dungeon generation with AABB collision detection.
 - Individual A* pathfinding, FSM (`PATROL`, `CHASE`, `FLEE`), and Bresenham Line-of-Sight Fog of War.
 - Basic melee sweep, projectile casting, particle emitter, and minimap HUD.
+

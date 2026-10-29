@@ -6,9 +6,28 @@ import java.util.Random;
 
 public class ProfileData {
     private static final int SAVE_MAGIC = 0x4752494D; // "GRIM"
-    private static final int SAVE_VERSION = 2;
+    private static final int SAVE_VERSION = 3;
 
     public static final int MAX_STAGES = 15;
+
+    // Available windowed resolution presets: { width, height }
+    public static final int[][] RES_PRESETS = {
+        { 960, 640 },
+        { 1280, 720 },
+        { 1440, 900 },
+        { 1600, 900 },
+        { 1920, 1080 }
+    };
+    public static final String[] RES_LABELS = {
+        "960 x 640 (Standart 3:2)",
+        "1280 x 720 (HD 720p)",
+        "1440 x 900 (WXGA+ 16:10)",
+        "1600 x 900 (HD+ 900p)",
+        "1920 x 1080 (Full HD 1080p)"
+    };
+
+    public GameState.DisplayMode displayMode = GameState.DisplayMode.WINDOWED;
+    public int resolutionIndex = 0;
 
     public int gold = 250;
     public int victoryChests = 1; // Start with 1 welcome chest so the player can test opening right away!
@@ -352,6 +371,9 @@ public class ProfileData {
                 out.writeInt(itemLevels[i]);
                 out.writeInt(itemCards[i]);
             }
+
+            out.writeInt(displayMode.ordinal());
+            out.writeInt(resolutionIndex);
         } catch (IOException ignored) {
         }
     }
@@ -365,7 +387,7 @@ public class ProfileData {
                 return false; // Legacy save format, keep fresh profile defaults
             }
             int version = in.readInt();
-            if (version != SAVE_VERSION) {
+            if (version != 2 && version != SAVE_VERSION) {
                 return false;
             }
             gold = in.readInt();
@@ -391,6 +413,14 @@ public class ProfileData {
             for (int i = 0; i < EquipmentItem.CATALOG.length; i++) {
                 itemLevels[i] = in.readInt();
                 itemCards[i] = in.readInt();
+            }
+
+            if (version >= 3) {
+                int dmOrd = in.readInt();
+                if (dmOrd >= 0 && dmOrd < GameState.DisplayMode.values().length) {
+                    displayMode = GameState.DisplayMode.values()[dmOrd];
+                }
+                resolutionIndex = Math.max(0, Math.min(RES_PRESETS.length - 1, in.readInt()));
             }
             return true;
         } catch (IOException e) {

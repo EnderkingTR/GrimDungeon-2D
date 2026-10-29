@@ -45,9 +45,9 @@ public class MenuSystem {
         int my = input.mouseY;
 
         if (state == GameState.MAIN_MENU) {
-            // Top Navigation Tabs (5 tabs)
+            // Top Navigation Tabs (6 tabs)
             GameState.MenuTab[] tabs = GameState.MenuTab.values();
-            int tabW = 172;
+            int tabW = 142;
             int startX = 40;
             for (int i = 0; i < tabs.length; i++) {
                 Rectangle tabRect = new Rectangle(startX + i * (tabW + 6), 52, tabW, 38);
@@ -63,6 +63,7 @@ public class MenuSystem {
                 case EQUIPMENT -> handleEquipmentClicks(mx, my);
                 case SKILLS -> handleSkillsClicks(mx, my);
                 case SHOP -> handleShopClicks(mx, my);
+                case SETTINGS -> handleSettingsClicks(mx, my);
             }
         } else if (state == GameState.CHEST_OPENING) {
             Rectangle closeBtn = new Rectangle(Engine.WIDTH / 2 - 110, 520, 220, 46);
@@ -278,6 +279,42 @@ public class MenuSystem {
         }
     }
 
+    private void handleSettingsClicks(int mx, int my) {
+        // Left Panel: Display Modes (Windowed, Borderless Fullscreen, Fullscreen)
+        GameState.DisplayMode[] modes = GameState.DisplayMode.values();
+        for (int i = 0; i < modes.length; i++) {
+            Rectangle modeBtn = new Rectangle(70, 185 + i * 70, 360, 52);
+            if (modeBtn.contains(mx, my)) {
+                profile.displayMode = modes[i];
+                profile.save();
+                engine.requestDisplayUpdate();
+                showToast("Ekran Modu: " + modes[i].displayName);
+                return;
+            }
+        }
+
+        // Debug overlay quick toggle button
+        Rectangle debugBtn = new Rectangle(70, 435, 360, 46);
+        if (debugBtn.contains(mx, my)) {
+            input.debugToggle = !input.debugToggle;
+            showToast("Debug Modu (F3): " + (input.debugToggle ? "AÇIK" : "KAPALI"));
+            return;
+        }
+
+        // Right Panel: Windowed Resolution Presets (5 presets)
+        for (int i = 0; i < ProfileData.RES_PRESETS.length; i++) {
+            Rectangle resBtn = new Rectangle(515, 185 + i * 62, 370, 48);
+            if (resBtn.contains(mx, my)) {
+                profile.resolutionIndex = i;
+                profile.displayMode = GameState.DisplayMode.WINDOWED;
+                profile.save();
+                engine.requestDisplayUpdate();
+                showToast("Çözünürlük: " + ProfileData.RES_LABELS[i] + " uygulandı!");
+                return;
+            }
+        }
+    }
+
     public void render(Graphics2D g, GameState state, CombatTracker tracker) {
         if (state == GameState.MAIN_MENU) {
             renderMainMenu(g);
@@ -327,9 +364,9 @@ public class MenuSystem {
         g.setColor(new Color(255, 165, 50));
         g.drawString("ZAFER SANDIĞI: " + profile.victoryChests, 775, 28);
 
-        // 5 Navigation Tabs
+        // 6 Navigation Tabs
         GameState.MenuTab[] tabs = GameState.MenuTab.values();
-        int tabW = 172;
+        int tabW = 142;
         int startX = 40;
         for (int i = 0; i < tabs.length; i++) {
             int tx = startX + i * (tabW + 6);
@@ -351,6 +388,7 @@ public class MenuSystem {
             case EQUIPMENT -> renderEquipmentTab(g);
             case SKILLS -> renderSkillsTab(g);
             case SHOP -> renderShopTab(g);
+            case SETTINGS -> renderSettingsTab(g);
         }
     }
 
@@ -782,6 +820,72 @@ public class MenuSystem {
         g.setFont(new Font("Consolas", Font.BOLD, 13));
         g.setColor(new Color(255, 215, 50));
         g.drawString("SATIN AL: " + price, x + 14, y + 66);
+    }
+
+    private void renderSettingsTab(Graphics2D g) {
+        // Left Panel: Display Modes
+        g.setColor(new Color(22, 26, 44, 235));
+        g.fillRoundRect(40, 115, 420, 460, 14, 14);
+        g.setColor(new Color(90, 145, 235));
+        g.drawRoundRect(40, 115, 420, 460, 14, 14);
+
+        g.setFont(new Font("Consolas", Font.BOLD, 18));
+        g.setColor(new Color(120, 215, 255));
+        g.drawString("🖥 EKRAN MODU SEÇENEKLERİ", 75, 155);
+
+        GameState.DisplayMode[] modes = GameState.DisplayMode.values();
+        for (int i = 0; i < modes.length; i++) {
+            boolean active = (profile.displayMode == modes[i]);
+            int by = 185 + i * 70;
+            g.setColor(active ? new Color(45, 135, 215) : new Color(32, 38, 58));
+            g.fillRoundRect(70, by, 360, 52, 10, 10);
+            g.setColor(active ? new Color(160, 230, 255) : new Color(75, 85, 115));
+            g.drawRoundRect(70, by, 360, 52, 10, 10);
+
+            g.setFont(new Font("Consolas", Font.BOLD, 14));
+            g.setColor(active ? Color.WHITE : new Color(195, 205, 225));
+            g.drawString((active ? "✓ " : "  ") + modes[i].displayName, 88, by + 31);
+        }
+
+        // Quick Debug Mode Toggle button
+        g.setColor(input.debugToggle ? new Color(45, 165, 95) : new Color(45, 50, 70));
+        g.fillRoundRect(70, 435, 360, 46, 10, 10);
+        g.setColor(Color.WHITE);
+        g.setFont(new Font("Consolas", Font.BOLD, 13));
+        g.drawString("DEBUG GÖRÜNÜMÜ [F3]: " + (input.debugToggle ? "AÇIK" : "KAPALI"), 95, 463);
+
+        g.setFont(new Font("Consolas", Font.PLAIN, 12));
+        g.setColor(new Color(255, 215, 80));
+        g.drawString("İpucu: Oyun içinde [F11] tuşuyla ekran modunu", 75, 515);
+        g.drawString("anında değiştirebilirsiniz.", 75, 535);
+
+        // Right Panel: Windowed Resolution Presets
+        g.setColor(new Color(22, 26, 44, 235));
+        g.fillRoundRect(480, 115, 440, 460, 14, 14);
+        g.setColor(new Color(255, 195, 60));
+        g.drawRoundRect(480, 115, 440, 460, 14, 14);
+
+        g.setFont(new Font("Consolas", Font.BOLD, 18));
+        g.setColor(new Color(255, 215, 70));
+        g.drawString("📐 PENCERE ÇÖZÜNÜRLÜĞÜ", 525, 155);
+
+        for (int i = 0; i < ProfileData.RES_PRESETS.length; i++) {
+            boolean active = (profile.displayMode == GameState.DisplayMode.WINDOWED && profile.resolutionIndex == i);
+            int by = 185 + i * 62;
+            g.setColor(active ? new Color(45, 175, 100) : new Color(32, 38, 58));
+            g.fillRoundRect(515, by, 370, 48, 10, 10);
+            g.setColor(active ? new Color(160, 255, 190) : new Color(75, 85, 115));
+            g.drawRoundRect(515, by, 370, 48, 10, 10);
+
+            g.setFont(new Font("Consolas", Font.BOLD, 14));
+            g.setColor(active ? Color.WHITE : new Color(205, 215, 230));
+            g.drawString((active ? "✓ " : "  ") + ProfileData.RES_LABELS[i], 535, by + 29);
+        }
+
+        g.setFont(new Font("Consolas", Font.PLAIN, 12));
+        g.setColor(new Color(175, 195, 225));
+        g.drawString("Not: Tüm çözünürlüklerde görüntü oranı otomatik", 515, 515);
+        g.drawString("korunur ve fare koordinatları ölçeklenir.", 515, 535);
     }
 
     private void renderChestOpeningModal(Graphics2D g) {

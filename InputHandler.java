@@ -2,23 +2,45 @@ import java.awt.event.*;
 
 public class InputHandler implements KeyListener, MouseListener, MouseMotionListener {
     private final boolean[] keys = new boolean[256];
-    public boolean up, down, left, right, debugToggle, regenerateMap, attack, skillUse, interact, saveGame, loadGame, escapeJustPressed;
+    public boolean up, down, left, right, debugToggle, regenerateMap, attack, skillUse, interact, saveGame, loadGame, escapeJustPressed, f11JustPressed;
     public boolean mouseAttack;
     public boolean rightMouseDown;
     public boolean mouseJustClicked;
+
+    // Virtual coordinates (mapped to 960x640 game space)
     public int mouseX, mouseY;
+    // Raw physical window coordinates
+    private int rawMouseX, rawMouseY;
+    private double viewScale = 1.0;
+    private double viewOffsetX = 0.0;
+    private double viewOffsetY = 0.0;
 
     private boolean debugPressedLastFrame = false;
     private boolean rPressedLastFrame = false;
     private boolean ePressedLastFrame = false;
     private boolean qPressedLastFrame = false;
     private boolean escPressedLastFrame = false;
+    private boolean f11PressedLastFrame = false;
     private boolean f5PressedLastFrame = false;
     private boolean f9PressedLastFrame = false;
     private boolean leftMouseDownLastFrame = false;
     private boolean rightMouseDownLastFrame = false;
 
+    public void setViewportTransform(double scale, double offsetX, double offsetY) {
+        this.viewScale = scale <= 0 ? 1.0 : scale;
+        this.viewOffsetX = offsetX;
+        this.viewOffsetY = offsetY;
+        recomputeVirtualMouse();
+    }
+
+    private void recomputeVirtualMouse() {
+        this.mouseX = (int) Math.round((rawMouseX - viewOffsetX) / viewScale);
+        this.mouseY = (int) Math.round((rawMouseY - viewOffsetY) / viewScale);
+    }
+
     public void update() {
+        recomputeVirtualMouse();
+
         up = keys[KeyEvent.VK_W] || keys[KeyEvent.VK_UP];
         down = keys[KeyEvent.VK_S] || keys[KeyEvent.VK_DOWN];
         left = keys[KeyEvent.VK_A] || keys[KeyEvent.VK_LEFT];
@@ -37,6 +59,10 @@ public class InputHandler implements KeyListener, MouseListener, MouseMotionList
         boolean escCurrent = keys[KeyEvent.VK_ESCAPE];
         escapeJustPressed = escCurrent && !escPressedLastFrame;
         escPressedLastFrame = escCurrent;
+
+        boolean f11Current = keys[KeyEvent.VK_F11];
+        f11JustPressed = f11Current && !f11PressedLastFrame;
+        f11PressedLastFrame = f11Current;
 
         boolean f3Current = keys[KeyEvent.VK_F3];
         if (f3Current && !debugPressedLastFrame)
@@ -80,8 +106,9 @@ public class InputHandler implements KeyListener, MouseListener, MouseMotionList
 
     @Override
     public void mousePressed(MouseEvent e) {
-        mouseX = e.getX();
-        mouseY = e.getY();
+        rawMouseX = e.getX();
+        rawMouseY = e.getY();
+        recomputeVirtualMouse();
         if (e.getButton() == MouseEvent.BUTTON1) {
             mouseAttack = true;
         } else if (e.getButton() == MouseEvent.BUTTON3) {
@@ -91,8 +118,9 @@ public class InputHandler implements KeyListener, MouseListener, MouseMotionList
 
     @Override
     public void mouseReleased(MouseEvent e) {
-        mouseX = e.getX();
-        mouseY = e.getY();
+        rawMouseX = e.getX();
+        rawMouseY = e.getY();
+        recomputeVirtualMouse();
         if (e.getButton() == MouseEvent.BUTTON1) {
             mouseAttack = false;
         } else if (e.getButton() == MouseEvent.BUTTON3) {
@@ -102,14 +130,16 @@ public class InputHandler implements KeyListener, MouseListener, MouseMotionList
 
     @Override
     public void mouseDragged(MouseEvent e) {
-        mouseX = e.getX();
-        mouseY = e.getY();
+        rawMouseX = e.getX();
+        rawMouseY = e.getY();
+        recomputeVirtualMouse();
     }
 
     @Override
     public void mouseMoved(MouseEvent e) {
-        mouseX = e.getX();
-        mouseY = e.getY();
+        rawMouseX = e.getX();
+        rawMouseY = e.getY();
+        recomputeVirtualMouse();
     }
 
     @Override
