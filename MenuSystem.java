@@ -52,6 +52,7 @@ public class MenuSystem {
             for (int i = 0; i < tabs.length; i++) {
                 Rectangle tabRect = new Rectangle(startX + i * (tabW + 6), 52, tabW, 38);
                 if (tabRect.contains(mx, my)) {
+                    AudioManager.play(AudioManager.Sfx.UI_CLICK);
                     currentTab = tabs[i];
                     return;
                 }
@@ -208,6 +209,7 @@ public class MenuSystem {
         Rectangle openChestBtn = new Rectangle(85, 390, 290, 52);
         if (openChestBtn.contains(mx, my)) {
             if (profile.victoryChests > 0) {
+                AudioManager.play(AudioManager.Sfx.CHEST_OPEN);
                 lastChestResult = profile.openVictoryChest(random);
                 engine.setGameState(GameState.CHEST_OPENING);
             } else {
@@ -220,6 +222,7 @@ public class MenuSystem {
         Rectangle buyChestBtn = new Rectangle(85, 458, 290, 44);
         if (buyChestBtn.contains(mx, my)) {
             if (profile.gold >= 180) {
+                AudioManager.play(AudioManager.Sfx.CHEST_OPEN);
                 profile.gold -= 180;
                 profile.victoryChests++;
                 lastChestResult = profile.openVictoryChest(random);
@@ -283,8 +286,9 @@ public class MenuSystem {
         // Left Panel: Display Modes (Windowed, Borderless Fullscreen, Fullscreen)
         GameState.DisplayMode[] modes = GameState.DisplayMode.values();
         for (int i = 0; i < modes.length; i++) {
-            Rectangle modeBtn = new Rectangle(70, 185 + i * 70, 360, 52);
+            Rectangle modeBtn = new Rectangle(70, 175 + i * 58, 360, 46);
             if (modeBtn.contains(mx, my)) {
+                AudioManager.play(AudioManager.Sfx.UI_CLICK);
                 profile.displayMode = modes[i];
                 profile.save();
                 engine.requestDisplayUpdate();
@@ -293,9 +297,27 @@ public class MenuSystem {
             }
         }
 
+        // Audio SFX & Music toggle buttons
+        Rectangle sfxBtn = new Rectangle(70, 365, 360, 44);
+        if (sfxBtn.contains(mx, my)) {
+            AudioManager.setSfxEnabled(!AudioManager.isSfxEnabled());
+            AudioManager.play(AudioManager.Sfx.UI_CLICK);
+            showToast("Ses Efektleri (SFX): " + (AudioManager.isSfxEnabled() ? "AÇIK" : "KAPALI"));
+            return;
+        }
+
+        Rectangle musicBtn = new Rectangle(70, 418, 360, 44);
+        if (musicBtn.contains(mx, my)) {
+            AudioManager.setMusicEnabled(!AudioManager.isMusicEnabled());
+            AudioManager.play(AudioManager.Sfx.UI_CLICK);
+            showToast("Arka Plan Müziği (BGM): " + (AudioManager.isMusicEnabled() ? "AÇIK" : "KAPALI"));
+            return;
+        }
+
         // Debug overlay quick toggle button
-        Rectangle debugBtn = new Rectangle(70, 435, 360, 46);
+        Rectangle debugBtn = new Rectangle(70, 471, 360, 44);
         if (debugBtn.contains(mx, my)) {
+            AudioManager.play(AudioManager.Sfx.UI_CLICK);
             input.debugToggle = !input.debugToggle;
             showToast("Debug Modu (F3): " + (input.debugToggle ? "AÇIK" : "KAPALI"));
             return;
@@ -305,6 +327,7 @@ public class MenuSystem {
         for (int i = 0; i < ProfileData.RES_PRESETS.length; i++) {
             Rectangle resBtn = new Rectangle(515, 185 + i * 62, 370, 48);
             if (resBtn.contains(mx, my)) {
+                AudioManager.play(AudioManager.Sfx.UI_CLICK);
                 profile.resolutionIndex = i;
                 profile.displayMode = GameState.DisplayMode.WINDOWED;
                 profile.save();
@@ -823,41 +846,52 @@ public class MenuSystem {
     }
 
     private void renderSettingsTab(Graphics2D g) {
-        // Left Panel: Display Modes
+        // Left Panel: Display Modes & Audio Controls
         g.setColor(new Color(22, 26, 44, 235));
         g.fillRoundRect(40, 115, 420, 460, 14, 14);
         g.setColor(new Color(90, 145, 235));
         g.drawRoundRect(40, 115, 420, 460, 14, 14);
 
-        g.setFont(new Font("Consolas", Font.BOLD, 18));
+        g.setFont(new Font("Consolas", Font.BOLD, 17));
         g.setColor(new Color(120, 215, 255));
-        g.drawString("🖥 EKRAN MODU SEÇENEKLERİ", 75, 155);
+        g.drawString("🖥 EKRAN VE SES AYARLARI", 75, 150);
 
         GameState.DisplayMode[] modes = GameState.DisplayMode.values();
         for (int i = 0; i < modes.length; i++) {
             boolean active = (profile.displayMode == modes[i]);
-            int by = 185 + i * 70;
+            int by = 175 + i * 58;
             g.setColor(active ? new Color(45, 135, 215) : new Color(32, 38, 58));
-            g.fillRoundRect(70, by, 360, 52, 10, 10);
+            g.fillRoundRect(70, by, 360, 46, 10, 10);
             g.setColor(active ? new Color(160, 230, 255) : new Color(75, 85, 115));
-            g.drawRoundRect(70, by, 360, 52, 10, 10);
+            g.drawRoundRect(70, by, 360, 46, 10, 10);
 
-            g.setFont(new Font("Consolas", Font.BOLD, 14));
+            g.setFont(new Font("Consolas", Font.BOLD, 13));
             g.setColor(active ? Color.WHITE : new Color(195, 205, 225));
-            g.drawString((active ? "✓ " : "  ") + modes[i].displayName, 88, by + 31);
+            g.drawString((active ? "✓ " : "  ") + modes[i].displayName, 86, by + 28);
         }
+
+        // Audio SFX Toggle Button
+        g.setColor(AudioManager.isSfxEnabled() ? new Color(45, 165, 95) : new Color(65, 45, 55));
+        g.fillRoundRect(70, 365, 360, 44, 10, 10);
+        g.setColor(Color.WHITE);
+        g.setFont(new Font("Consolas", Font.BOLD, 13));
+        g.drawString("🔊 SES EFEKTLERİ (SFX): " + (AudioManager.isSfxEnabled() ? "AÇIK" : "KAPALI"), 92, 392);
+
+        // Audio BGM Toggle Button
+        g.setColor(AudioManager.isMusicEnabled() ? new Color(45, 165, 95) : new Color(65, 45, 55));
+        g.fillRoundRect(70, 418, 360, 44, 10, 10);
+        g.setColor(Color.WHITE);
+        g.drawString("🎵 ARKA PLAN MÜZİĞİ (BGM): " + (AudioManager.isMusicEnabled() ? "AÇIK" : "KAPALI"), 82, 445);
 
         // Quick Debug Mode Toggle button
         g.setColor(input.debugToggle ? new Color(45, 165, 95) : new Color(45, 50, 70));
-        g.fillRoundRect(70, 435, 360, 46, 10, 10);
+        g.fillRoundRect(70, 471, 360, 44, 10, 10);
         g.setColor(Color.WHITE);
-        g.setFont(new Font("Consolas", Font.BOLD, 13));
-        g.drawString("DEBUG GÖRÜNÜMÜ [F3]: " + (input.debugToggle ? "AÇIK" : "KAPALI"), 95, 463);
+        g.drawString("🐞 DEBUG GÖRÜNÜMÜ [F3]: " + (input.debugToggle ? "AÇIK" : "KAPALI"), 92, 498);
 
         g.setFont(new Font("Consolas", Font.PLAIN, 12));
         g.setColor(new Color(255, 215, 80));
-        g.drawString("İpucu: Oyun içinde [F11] tuşuyla ekran modunu", 75, 515);
-        g.drawString("anında değiştirebilirsiniz.", 75, 535);
+        g.drawString("İpucu: [F11] ile ekran modunu anında değiştirebilirsiniz.", 65, 545);
 
         // Right Panel: Windowed Resolution Presets
         g.setColor(new Color(22, 26, 44, 235));

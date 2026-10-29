@@ -1,5 +1,6 @@
 import java.awt.*;
 import java.awt.geom.AffineTransform;
+import java.awt.image.BufferedImage;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Random;
@@ -17,6 +18,8 @@ public class Player extends Entity {
 
     private int facingX = 0, facingY = 1;
     private double aimAngle = 0;
+    private double walkPhase = 0;
+    private boolean isMoving = false;
 
     // Attack & Skill timers
     private int attackTimer = 0;
@@ -69,13 +72,17 @@ public class Player extends Entity {
         if (input.left) dx -= 1;
         if (input.right) dx += 1;
 
-        if (dx != 0 || dy != 0) {
+        isMoving = (dx != 0 || dy != 0);
+        if (isMoving) {
+            walkPhase += 0.28;
             facingX = (int) Math.signum(dx);
             facingY = (int) Math.signum(dy);
 
             double len = Math.sqrt(dx * dx + dy * dy);
             dx /= len;
             dy /= len;
+        } else {
+            walkPhase += 0.08;
         }
 
         if (dashTimer > 0) {
@@ -116,6 +123,7 @@ public class Player extends Entity {
             }
 
             if (heroClass.isMelee()) {
+                AudioManager.play(AudioManager.Sfx.SWING);
                 attackMaxDuration = switch (heroClass) {
                     case ASSASSIN -> 7;
                     case VIKING -> 14;
@@ -127,6 +135,7 @@ public class Player extends Entity {
                 updateAttackBox();
             } else {
                 // Ranged classes: ARCHER or MAGE
+                AudioManager.play(AudioManager.Sfx.SHOOT);
                 attackCooldown = stats.attackCooldown;
                 boolean[] isCrit = new boolean[1];
                 int dmg = rollDamage(isCrit);
@@ -194,6 +203,7 @@ public class Player extends Entity {
                 if (e instanceof Chest chest && interactArea.intersects(chest.getBounds())) {
                     int reward = chest.open();
                     if (reward > 0) {
+                        AudioManager.play(AudioManager.Sfx.CHEST_OPEN);
                         gold += reward;
                         engine.getCombatTracker().goldEarnedInStage += reward;
                         hp = Math.min(maxHp, hp + 25);
@@ -207,6 +217,7 @@ public class Player extends Entity {
     }
 
     private void activateClassSkill(List<Entity> entities, Engine engine) {
+        AudioManager.play(AudioManager.Sfx.SKILL);
         skillCooldown = stats.skillCooldown;
         int skillDmg = (int) Math.round(baseDamage * 1.75 * stats.skillPowerMultiplier);
 
@@ -304,6 +315,22 @@ public class Player extends Entity {
 
     @Override
     public void render(Graphics2D g, boolean debug) {
+        // Warm dynamic lantern aura around the player
+        int lightRadius = 115;
+        RadialGradientPaint playerAura = new RadialGradientPaint(
+                new Point((int) getCenterX(), (int) getCenterY()), lightRadius,
+                new float[]{0f, 0.6f, 1f},
+                new Color[]{
+                    new Color(heroClass.themeColor.getRed(), heroClass.themeColor.getGreen(), heroClass.themeColor.getBlue(), 42),
+                    new Color(255, 200, 110, 18),
+                    new Color(0, 0, 0, 0)
+                }
+        );
+        Paint oldPaint = g.getPaint();
+        g.setPaint(playerAura);
+        g.fillOval((int) getCenterX() - lightRadius, (int) getCenterY() - lightRadius, lightRadius * 2, lightRadius * 2);
+        g.setPaint(oldPaint);
+
         // Draw melee weapon sweep animation
         if (attackBox != null) {
             Color c = heroClass.themeColor;
@@ -314,60 +341,78 @@ public class Player extends Entity {
         }
 
         // Shadow under hero
-        g.setColor(new Color(0, 0, 0, 110));
-        g.fillOval((int) x + 2, (int) y + height - 7, width - 4, 10);
+        g.setColor(new Color(0, 0, 0, 125));
+        g.fillOval((int) x + 2, (int) y + height - 6, width - 4, 10);
 
-        // Body color based on HeroClass (or white flash on hurt / invulnerable glow)
-        if (hurtTimer > 0) {
-            g.setColor(Color.WHITE);
-        } else if (invulnerableTimer > 0) {
-            g.setColor(new Color(220, 160, 255));
-        } else {
-            g.setColor(heroClass.themeColor);
+        // Animated walking gait / breathing bob offset
+        int bobY = (int) Math.round(Math.sin(walkPhase) * (isMoving ? 2.5 : 1.0));
+        int drawY = (int) y + bobY;
+
+        // Animated feet when moving
+        if (isMoving) {
+            int footOffset = (int) Math.round(Math.cos(walkPhase) * 4);
+            g.setColor(new Color(40, 35, 30));
+            g.fillOval((int) x + 5, (int) y + height - 5 + footOffset, 7, 6);
+            g.fillOval((int) x + width - 12, (int) y + height - 5 - footOffset, 7, 6);
         }
-        g.fillRoundRect((int) x, (int) y, width, height, 10, 10);
 
-        // Class-specific visual armor/headgear details
-        g.setColor(new Color(25, 28, 38));
-        g.drawRoundRect((int) x, (int) y, width, height, 10, 10);
+        // Check for custom external PNG sprite first ("warrior.png", "assassin.png", etc.)
+        BufferedImage customSprite = SpriteManager.getSprite(heroClass.name().toLowerCase() + ".png");
+        if (customSprite != null) {
+            g.drawImage(customSprite, (int) x, drawY, width, height, null);
+        } else {
+            // Body color based on HeroClass (or white flash on hurt / invulnerable glow)
+            if (hurtTimer > 0) {
+                g.setColor(Color.WHITE);
+            } else if (invulnerableTimer > 0) {
+                g.setColor(new Color(220, 160, 255));
+            } else {
+                g.setColor(heroClass.themeColor);
+            }
+            g.fillRoundRect((int) x, drawY, width, height, 10, 10);
 
-        switch (heroClass) {
-            case WARRIOR -> {
-                // Knight visor & silver trim
-                g.setColor(new Color(210, 220, 235));
-                g.fillRoundRect((int) x + 4, (int) y + 3, width - 8, 10, 4, 4);
-                g.setColor(new Color(30, 40, 60));
-                g.fillRect((int) x + 8, (int) y + 7, width - 16, 3);
-            }
-            case ASSASSIN -> {
-                // Dark shadow hood & glowing crimson eyes
-                g.setColor(new Color(45, 20, 65));
-                g.fillRoundRect((int) x + 3, (int) y + 2, width - 6, 13, 6, 6);
-                g.setColor(new Color(255, 70, 90));
-                g.fillRect((int) x + 8, (int) y + 9, 5, 3);
-                g.fillRect((int) x + width - 13, (int) y + 9, 5, 3);
-            }
-            case VIKING -> {
-                // Horned helmet
-                g.setColor(new Color(235, 225, 200));
-                g.fillPolygon(new int[]{(int) x, (int) x - 7, (int) x + 5}, new int[]{(int) y + 8, (int) y - 4, (int) y + 2}, 3);
-                g.fillPolygon(new int[]{(int) x + width, (int) x + width + 7, (int) x + width - 5}, new int[]{(int) y + 8, (int) y - 4, (int) y + 2}, 3);
-                g.setColor(new Color(120, 70, 40));
-                g.fillRect((int) x + 4, (int) y + 3, width - 8, 7);
-            }
-            case ARCHER -> {
-                // Ranger feathered cap
-                g.setColor(new Color(30, 125, 60));
-                g.fillRoundRect((int) x + 3, (int) y + 2, width - 6, 9, 5, 5);
-                g.setColor(new Color(255, 220, 70));
-                g.drawLine((int) x + width - 5, (int) y + 4, (int) x + width + 4, (int) y - 4);
-            }
-            case MAGE -> {
-                // Arcane pointed hat & glowing rune
-                g.setColor(new Color(25, 55, 130));
-                g.fillPolygon(new int[]{(int) x + 2, (int) getCenterX(), (int) x + width - 2}, new int[]{(int) y + 8, (int) y - 9, (int) y + 8}, 3);
-                g.setColor(new Color(140, 245, 255));
-                g.fillOval((int) getCenterX() - 3, (int) y + 14, 6, 6);
+            // Class-specific visual armor/headgear details
+            g.setColor(new Color(25, 28, 38));
+            g.drawRoundRect((int) x, drawY, width, height, 10, 10);
+
+            switch (heroClass) {
+                case WARRIOR -> {
+                    // Knight visor & silver trim
+                    g.setColor(new Color(210, 220, 235));
+                    g.fillRoundRect((int) x + 4, drawY + 3, width - 8, 10, 4, 4);
+                    g.setColor(new Color(30, 40, 60));
+                    g.fillRect((int) x + 8, drawY + 7, width - 16, 3);
+                }
+                case ASSASSIN -> {
+                    // Dark shadow hood & glowing crimson eyes
+                    g.setColor(new Color(45, 20, 65));
+                    g.fillRoundRect((int) x + 3, drawY + 2, width - 6, 13, 6, 6);
+                    g.setColor(new Color(255, 70, 90));
+                    g.fillRect((int) x + 8, drawY + 9, 5, 3);
+                    g.fillRect((int) x + width - 13, drawY + 9, 5, 3);
+                }
+                case VIKING -> {
+                    // Horned helmet
+                    g.setColor(new Color(235, 225, 200));
+                    g.fillPolygon(new int[]{(int) x, (int) x - 7, (int) x + 5}, new int[]{drawY + 8, drawY - 4, drawY + 2}, 3);
+                    g.fillPolygon(new int[]{(int) x + width, (int) x + width + 7, (int) x + width - 5}, new int[]{drawY + 8, drawY - 4, drawY + 2}, 3);
+                    g.setColor(new Color(120, 70, 40));
+                    g.fillRect((int) x + 4, drawY + 3, width - 8, 7);
+                }
+                case ARCHER -> {
+                    // Ranger feathered cap
+                    g.setColor(new Color(30, 125, 60));
+                    g.fillRoundRect((int) x + 3, drawY + 2, width - 6, 9, 5, 5);
+                    g.setColor(new Color(255, 220, 70));
+                    g.drawLine((int) x + width - 5, drawY + 4, (int) x + width + 4, drawY - 4);
+                }
+                case MAGE -> {
+                    // Arcane pointed hat & glowing rune
+                    g.setColor(new Color(25, 55, 130));
+                    g.fillPolygon(new int[]{(int) x + 2, (int) getCenterX(), (int) x + width - 2}, new int[]{drawY + 8, drawY - 9, drawY + 8}, 3);
+                    g.setColor(new Color(140, 245, 255));
+                    g.fillOval((int) getCenterX() - 3, drawY + 14, 6, 6);
+                }
             }
         }
 

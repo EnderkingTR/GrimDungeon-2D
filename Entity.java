@@ -83,6 +83,12 @@ public abstract class Entity {
         hp -= finalDamage;
         hurtTimer = (this instanceof Player) ? 18 : 9;
 
+        if (this instanceof Player) {
+            AudioManager.play(AudioManager.Sfx.PLAYER_HURT);
+        } else if (isHostile) {
+            AudioManager.play(isCrit ? AudioManager.Sfx.CRIT : AudioManager.Sfx.HIT);
+        }
+
         if (engineRef != null) {
             if (this instanceof Player) {
                 engineRef.getCombatTracker().totalDamageTaken += finalDamage;

@@ -1,4 +1,5 @@
 import java.awt.*;
+import java.awt.image.BufferedImage;
 import java.util.Collections;
 import java.util.List;
 
@@ -80,22 +81,30 @@ public class RangedEnemy extends Entity {
 
     @Override
     public void render(Graphics2D g, boolean debug) {
-        if (hurtTimer > 0) {
-            g.setColor(Color.WHITE);
-        } else if (stunTimer > 0) {
-            g.setColor(new Color(255, 230, 90));
-        } else {
-            g.setColor(new Color(145, 45, 195));
-        }
-        // Hooded diamond/robe silhouette
-        g.fillRoundRect((int) x, (int) y, width, height, 10, 10);
-        g.setColor(new Color(50, 15, 75));
-        g.drawRoundRect((int) x, (int) y, width, height, 10, 10);
+        g.setColor(new Color(0, 0, 0, 110));
+        g.fillOval((int) x + 2, (int) y + height - 6, width - 4, 9);
 
-        // Glowing magenta arcane eyes
-        g.setColor(new Color(255, 110, 240));
-        g.fillOval((int) x + 6, (int) y + 8, 5, 5);
-        g.fillOval((int) x + width - 11, (int) y + 8, 5, 5);
+        BufferedImage sprite = SpriteManager.getSprite("enemy_ranged.png");
+        if (sprite != null && hurtTimer == 0) {
+            g.drawImage(sprite, (int) x, (int) y, width, height, null);
+        } else {
+            if (hurtTimer > 0) {
+                g.setColor(Color.WHITE);
+            } else if (stunTimer > 0) {
+                g.setColor(new Color(255, 230, 90));
+            } else {
+                g.setColor(new Color(145, 45, 195));
+            }
+            // Hooded diamond/robe silhouette
+            g.fillRoundRect((int) x, (int) y, width, height, 10, 10);
+            g.setColor(new Color(50, 15, 75));
+            g.drawRoundRect((int) x, (int) y, width, height, 10, 10);
+
+            // Glowing magenta arcane eyes
+            g.setColor(new Color(255, 110, 240));
+            g.fillOval((int) x + 6, (int) y + 8, 5, 5);
+            g.fillOval((int) x + width - 11, (int) y + 8, 5, 5);
+        }
 
         drawHealthBar(g);
     }

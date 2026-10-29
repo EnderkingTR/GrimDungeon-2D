@@ -1,4 +1,5 @@
 import java.awt.*;
+import java.awt.image.BufferedImage;
 import java.util.Collections;
 import java.util.List;
 import java.util.Random;
@@ -150,20 +151,29 @@ public class Enemy extends Entity {
             }
         }
 
-        if (hurtTimer > 0) {
-            g.setColor(Color.WHITE);
-        } else if (stunTimer > 0) {
-            g.setColor(new Color(255, 230, 80));
-        } else if (state == AIState.FLEE) {
-            g.setColor(new Color(180, 70, 230));
-        } else {
-            g.setColor(new Color(220, 50, 50));
-        }
-        g.fillRoundRect((int) x, (int) y, width, height, 6, 6);
+        // Drop shadow
+        g.setColor(new Color(0, 0, 0, 110));
+        g.fillOval((int) x + 2, (int) y + height - 6, width - 4, 9);
 
-        g.setColor(Color.YELLOW);
-        g.fillRect((int) x + 6, (int) y + 8, 5, 5);
-        g.fillRect((int) x + width - 11, (int) y + 8, 5, 5);
+        BufferedImage sprite = SpriteManager.getSprite("enemy_melee.png");
+        if (sprite != null && hurtTimer == 0) {
+            g.drawImage(sprite, (int) x, (int) y, width, height, null);
+        } else {
+            if (hurtTimer > 0) {
+                g.setColor(Color.WHITE);
+            } else if (stunTimer > 0) {
+                g.setColor(new Color(255, 230, 80));
+            } else if (state == AIState.FLEE) {
+                g.setColor(new Color(180, 70, 230));
+            } else {
+                g.setColor(new Color(220, 50, 50));
+            }
+            g.fillRoundRect((int) x, (int) y, width, height, 6, 6);
+
+            g.setColor(Color.YELLOW);
+            g.fillRect((int) x + 6, (int) y + 8, 5, 5);
+            g.fillRect((int) x + width - 11, (int) y + 8, 5, 5);
+        }
 
         drawHealthBar(g);
 

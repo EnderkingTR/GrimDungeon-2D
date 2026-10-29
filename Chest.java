@@ -1,4 +1,5 @@
 import java.awt.*;
+import java.awt.image.BufferedImage;
 
 public class Chest extends Entity {
     private boolean opened = false;
@@ -21,6 +22,12 @@ public class Chest extends Entity {
 
     @Override
     public void render(Graphics2D g, boolean debug) {
+        BufferedImage sprite = SpriteManager.getSprite(opened ? "chest_open.png" : "chest.png");
+        if (sprite != null) {
+            g.drawImage(sprite, (int) x, (int) y, width, height, null);
+            return;
+        }
+
         g.setColor(opened ? new Color(90, 65, 45) : new Color(215, 155, 40));
         g.fillRoundRect((int) x, (int) y, width, height, 6, 6);
         g.setColor(new Color(45, 30, 15));

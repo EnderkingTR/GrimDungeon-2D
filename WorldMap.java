@@ -1,4 +1,5 @@
 import java.awt.*;
+import java.awt.image.BufferedImage;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Random;
@@ -11,6 +12,7 @@ public class WorldMap {
     private final boolean[][] visible;
     private final Random random = new Random();
     private final List<Rectangle> rooms = new ArrayList<>();
+    private final List<Point> torches = new ArrayList<>();
 
     public double spawnX, spawnY;
 
@@ -53,6 +55,7 @@ public class WorldMap {
 
     public void generateDungeon(int maxRooms) {
         rooms.clear();
+        torches.clear();
         for (int x = 0; x < width; x++) {
             for (int y = 0; y < height; y++) {
                 tiles[x][y] = TileType.WALL;
@@ -167,6 +170,11 @@ public class WorldMap {
                 tiles[x][y] = TileType.FLOOR;
             }
         }
+        // Place atmospheric wall torches on the top corners of the room
+        torches.add(new Point(room.x, room.y));
+        if (room.width >= 6) {
+            torches.add(new Point(room.x + room.width - 1, room.y));
+        }
     }
 
     private void carveHorizontalCorridor(int x1, int x2, int y) {
@@ -212,6 +220,10 @@ public class WorldMap {
         int endX = Math.min(width, (int) ((camX + Engine.WIDTH) / Engine.TILE_SIZE) + 2);
         int endY = Math.min(height, (int) ((camY + Engine.HEIGHT) / Engine.TILE_SIZE) + 2);
 
+        BufferedImage floorImg = SpriteManager.getSprite("floor.png");
+        BufferedImage wallImg = SpriteManager.getSprite("wall.png");
+        long animTick = System.currentTimeMillis() / 90;
+
         for (int x = startX; x < endX; x++) {
             for (int y = startY; y < endY; y++) {
                 int drawX = x * Engine.TILE_SIZE;
@@ -225,12 +237,51 @@ public class WorldMap {
                 }
 
                 TileType tile = tiles[x][y];
-                g.setColor(tile.baseColor);
-                g.fillRect(drawX, drawY, Engine.TILE_SIZE, Engine.TILE_SIZE);
+                int hash = (x * 73856093) ^ (y * 19349663);
 
-                if (tile == TileType.WALL) {
-                    g.setColor(tile.borderColor);
-                    g.fillRect(drawX, drawY + Engine.TILE_SIZE - 10, Engine.TILE_SIZE, 10);
+                if (tile == TileType.FLOOR) {
+                    if (floorImg != null) {
+                        g.drawImage(floorImg, drawX, drawY, Engine.TILE_SIZE, Engine.TILE_SIZE, null);
+                    } else {
+                        // Procedural stone dungeon cobble floor with subtle variation & moss accents
+                        int shade = Math.abs(hash % 7) - 3;
+                        g.setColor(new Color(
+                                Math.max(0, tile.baseColor.getRed() + shade),
+                                Math.max(0, tile.baseColor.getGreen() + shade),
+                                Math.max(0, tile.baseColor.getBlue() + shade)
+                        ));
+                        g.fillRect(drawX, drawY, Engine.TILE_SIZE, Engine.TILE_SIZE);
+
+                        // Stone tile inner bevel & crack/moss details
+                        g.setColor(new Color(32, 33, 42));
+                        g.drawRect(drawX + 4, drawY + 4, Engine.TILE_SIZE - 8, Engine.TILE_SIZE - 8);
+                        if ((hash & 15) == 0) {
+                            g.setColor(new Color(45, 72, 48, 120));
+                            g.fillOval(drawX + 10, drawY + 14, 8, 6);
+                        }
+                    }
+                } else {
+                    if (wallImg != null) {
+                        g.drawImage(wallImg, drawX, drawY, Engine.TILE_SIZE, Engine.TILE_SIZE, null);
+                    } else {
+                        // Procedural 2.5D dungeon brick wall
+                        g.setColor(tile.baseColor);
+                        g.fillRect(drawX, drawY, Engine.TILE_SIZE, Engine.TILE_SIZE);
+
+                        // Top highlight edge
+                        g.setColor(new Color(46, 48, 62));
+                        g.fillRect(drawX, drawY, Engine.TILE_SIZE, 5);
+
+                        // Brick mortar lines
+                        g.setColor(tile.borderColor);
+                        g.drawLine(drawX, drawY + 18, drawX + Engine.TILE_SIZE, drawY + 18);
+                        g.drawLine(drawX + 24, drawY, drawX + 24, drawY + 18);
+                        g.drawLine(drawX + 12, drawY + 18, drawX + 12, drawY + 36);
+
+                        // 2.5D bottom wall face shadow
+                        g.setColor(tile.borderColor);
+                        g.fillRect(drawX, drawY + Engine.TILE_SIZE - 11, Engine.TILE_SIZE, 11);
+                    }
                 }
 
                 g.setColor(tile.borderColor);
@@ -240,6 +291,40 @@ public class WorldMap {
                 if (!debug && !visible[x][y]) {
                     g.setColor(new Color(10, 10, 16, 165));
                     g.fillRect(drawX, drawY, Engine.TILE_SIZE, Engine.TILE_SIZE);
+                }
+            }
+        }
+
+        // Render wall torches & warm flickering light halos
+        for (Point t : torches) {
+            if (t.x >= startX - 2 && t.x <= endX + 2 && t.y >= startY - 2 && t.y <= endY + 2) {
+                if (debug || visible[t.x][t.y]) {
+                    int tx = t.x * Engine.TILE_SIZE + Engine.TILE_SIZE / 2;
+                    int ty = t.y * Engine.TILE_SIZE + 8;
+                    int flicker = (int) (Math.sin(animTick + t.x * 3 + t.y) * 6);
+                    int radius = 78 + flicker;
+
+                    RadialGradientPaint glow = new RadialGradientPaint(
+                            new Point(tx, ty), radius,
+                            new float[]{0f, 0.55f, 1f},
+                            new Color[]{
+                                new Color(255, 185, 70, 75),
+                                new Color(240, 115, 30, 28),
+                                new Color(0, 0, 0, 0)
+                            }
+                    );
+                    Paint oldPaint = g.getPaint();
+                    g.setPaint(glow);
+                    g.fillOval(tx - radius, ty - radius, radius * 2, radius * 2);
+                    g.setPaint(oldPaint);
+
+                    // Torch bracket & animated flame core
+                    g.setColor(new Color(95, 65, 35));
+                    g.fillRect(tx - 2, ty, 4, 9);
+                    g.setColor(new Color(255, 140, 30));
+                    g.fillOval(tx - 5, ty - 7, 10, 10);
+                    g.setColor(new Color(255, 240, 130));
+                    g.fillOval(tx - 3, ty - 5, 6, 6);
                 }
             }
         }

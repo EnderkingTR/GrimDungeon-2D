@@ -56,6 +56,8 @@ public class Engine extends Canvas implements Runnable {
         profile = new ProfileData();
         profile.load();
 
+        AudioManager.init();
+
         worldMap = new WorldMap(60, 60);
         menuSystem = new MenuSystem(this, profile, input);
         populateWorld(profile.selectedStage);
@@ -385,6 +387,7 @@ public class Engine extends Canvas implements Runnable {
         }
 
         if (!player.active) {
+            AudioManager.play(AudioManager.Sfx.GAME_OVER);
             profile.gold += player.gold;
             profile.save();
             gameState = GameState.GAME_OVER;
@@ -399,6 +402,7 @@ public class Engine extends Canvas implements Runnable {
                 e.engineRef = this;
                 e.update(worldMap, player);
                 if (!e.active && e.isHostile) {
+                    AudioManager.play(AudioManager.Sfx.KILL);
                     int goldDrop = (e instanceof SwarmEnemy) ? 8 : (e instanceof TurretEnemy ? 28 : 18);
                     spawnParticles(e.getCenterX(), e.getCenterY(), new Color(220, 40, 40), 22);
                     player.gold += goldDrop;
@@ -427,6 +431,7 @@ public class Engine extends Canvas implements Runnable {
         // Check automatic Stage Clear condition: all hostile enemies defeated!
         long remainingHostiles = entities.stream().filter(e -> e.active && e.isHostile).count();
         if (remainingHostiles == 0) {
+            AudioManager.play(AudioManager.Sfx.STAGE_CLEAR);
             int stageBonusGold = 50 + profile.selectedStage * 20;
             combatTracker.goldEarnedInStage += stageBonusGold;
             profile.gold += player.gold + stageBonusGold;

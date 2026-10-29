@@ -4,6 +4,28 @@ All notable changes and architectural milestones for **GrimDungeon 2D** are docu
 
 ---
 
+## [v2.1.0] - 2026-10-29 — The Audio, Lighting & Display Options Update
+
+### 🎵 Hybrid Audio Subsystem (`AudioManager.java`)
+- **16-Bit Procedural Synth:** Generates in-memory retro sound effects with zero external file requirements (`SWING`, `SHOOT`, `HIT`, `CRIT`, `PLAYER_HURT`, `KILL`, `COIN`, `SKILL`, `CHEST_OPEN`, `STAGE_CLEAR`, `GAME_OVER`, `UI_CLICK`).
+- **Dark Fantasy Ambient BGM:** Seamless polyphonic dungeon synth progression generated on the fly.
+- **External WAV Audio Loader:** Automatically discovers and plays `.wav` files placed in `assets/audio/sfx/` and `assets/audio/music/bgm.wav`.
+- **Audio Settings:** Added interactive SFX and BGM toggle buttons inside the Settings lobby tab.
+
+### 🖥️ Display Modes & Resolution Presets (`MenuSystem.java`, `Engine.java`, `InputHandler.java`)
+- **3 Display Modes:** Windowed, Borderless Fullscreen, and Exclusive Hardware Fullscreen.
+- **5 Resolution Presets:** `960x640`, `1280x720 (HD)`, `1440x900`, `1600x900 (HD+)`, and `1920x1080 (Full HD)`.
+- **[F11] Shortcut:** Instant one-key display mode toggle during gameplay or menus.
+- **Aspect-Ratio Preserving Scaling:** Virtual 960x640 canvas coordinates automatically map mouse input and rendering to any screen dimension with letterbox/pillarbox support.
+
+### 🎨 Visual Art, Dynamic Lighting & Sprite Loader (`SpriteManager.java`, `WorldMap.java`, `Player.java`)
+- **Dynamic Torch Lighting:** Wall torches in rooms cast warm flickering radial lighting (`RadialGradientPaint`) with animated flame cores.
+- **2.5D Dungeon Geometry:** Procedural wall depth bevels, masonry mortar lines, and cobble floor textures.
+- **Player Aura & Walking Gait:** Dynamic lantern aura around the player and walking gait bobbing animation (`walkPhase`).
+- **Custom PNG Sprite Loader:** Automatically loads custom sprites from `assets/sprites/` (`warrior.png`, `assassin.png`, `viking.png`, `archer.png`, `mage.png`, `enemy_melee.png`, `chest.png`, `floor.png`, `wall.png`).
+
+---
+
 ## [v2.0.0] - 2026-10-29 — The Campaign, Heroes & Hive-Mind Update
 
 ### 🏆 Campaign & 5-Tab Main Menu System (`MenuSystem.java`, `GameState.java`)

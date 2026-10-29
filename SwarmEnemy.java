@@ -1,4 +1,5 @@
 import java.awt.*;
+import java.awt.image.BufferedImage;
 
 /**
  * Small, fast, low-HP swarm creature guided by a shared SwarmHiveMind.
@@ -58,21 +59,26 @@ public class SwarmEnemy extends Entity {
             }
         }
 
-        if (hurtTimer > 0) {
-            g.setColor(Color.WHITE);
-        } else if (stunTimer > 0) {
-            g.setColor(new Color(255, 230, 90));
+        BufferedImage sprite = SpriteManager.getSprite("enemy_swarm.png");
+        if (sprite != null && hurtTimer == 0) {
+            g.drawImage(sprite, (int) x, (int) y, width, height, null);
         } else {
-            g.setColor(new Color(240, 135, 35));
-        }
-        g.fillOval((int) x, (int) y, width, height);
-        g.setColor(new Color(70, 30, 10));
-        g.drawOval((int) x, (int) y, width, height);
+            if (hurtTimer > 0) {
+                g.setColor(Color.WHITE);
+            } else if (stunTimer > 0) {
+                g.setColor(new Color(255, 230, 90));
+            } else {
+                g.setColor(new Color(240, 135, 35));
+            }
+            g.fillOval((int) x, (int) y, width, height);
+            g.setColor(new Color(70, 30, 10));
+            g.drawOval((int) x, (int) y, width, height);
 
-        // Glowing red swarm eyes
-        g.setColor(Color.RED);
-        g.fillRect((int) x + 4, (int) y + 5, 3, 3);
-        g.fillRect((int) x + width - 7, (int) y + 5, 3, 3);
+            // Glowing red swarm eyes
+            g.setColor(Color.RED);
+            g.fillRect((int) x + 4, (int) y + 5, 3, 3);
+            g.fillRect((int) x + width - 7, (int) y + 5, 3, 3);
+        }
 
         drawHealthBar(g);
     }
